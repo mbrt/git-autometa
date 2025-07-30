@@ -57,51 +57,6 @@ def format_branch_name(pattern: str, issue: JiraIssue, max_length: int = 50) -> 
     return branch_name
 
 
-def load_pr_template(template_path: str, issue: JiraIssue) -> str:
-    """
-    Load and format PR template
-
-    Args:
-        template_path: Path to template file
-        issue: JIRA issue
-
-    Returns:
-        Formatted template content
-    """
-    try:
-        # Try relative to current directory first
-        path = Path(template_path)
-        if not path.exists():
-            # Try relative to git root
-            git_utils = GitUtils()
-            git_root = Path(git_utils.repo.working_dir)
-            path = git_root / template_path
-
-        if not path.exists():
-            # Try package default
-            package_dir = Path(__file__).parent.parent.parent
-            path = package_dir / template_path
-
-        if path.exists():
-            content = path.read_text()
-            return content.format(
-                jira_id=issue.key,
-                jira_title=issue.summary,
-                jira_description=issue.description or "See JIRA issue for details.",
-                jira_url=issue.url,
-                jira_type=issue.issue_type
-            )
-        else:
-            console.print(
-                f"[yellow]Warning: Template not found at {template_path}[/yellow]")
-            return f"Resolves {issue.key}: {issue.summary}\n\n{issue.url}"
-
-    except Exception as e:
-        console.print(
-            f"[yellow]Warning: Failed to load template: {e}[/yellow]")
-        return f"Resolves {issue.key}: {issue.summary}\n\n{issue.url}"
-
-
 @click.group()
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
@@ -208,7 +163,13 @@ def create_pr(ctx, base_branch, no_draft):
             jira_title=issue.summary,
             jira_type=issue.issue_type
         )
-        pr_body = load_pr_template(config.pr_template_path, issue)
+        pr_body = config.pr_template.format(
+            jira_id=issue.key,
+            jira_title=issue.summary,
+            jira_description=issue.description or "See JIRA issue for details.",
+            jira_url=issue.url,
+            jira_type=issue.issue_type
+        )
         base = base_branch or config.pr_base_branch or github_client.get_default_branch()
         draft = config.pr_draft and not no_draft
 
@@ -415,7 +376,7 @@ def config_show(ctx):
     console.print(f"Title Pattern: {config.pr_title_pattern}")
     console.print(f"Draft: {config.pr_draft}")
     console.print(f"Base Branch: {config.pr_base_branch}")
-    console.print(f"Template Path: {config.pr_template_path}")
+    console.print(f"Template: [dim]Stored in config[/dim]")
 
     console.print("\n[bold]Logging[/bold]")
     console.print(f"Log Level: {config.log_level}")

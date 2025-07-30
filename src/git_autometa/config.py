@@ -238,11 +238,11 @@ class Config:
         repo_id = self._get_repo_identifier()
         if not repo_id:
             raise ValueError("Not in a git repository with GitHub remote")
-        
+
         try:
             repo_config_dir = self.config_dir / "repositories"
             repo_config_dir.mkdir(parents=True, exist_ok=True)
-            
+
             repo_config_path = repo_config_dir / f"{repo_id}.yaml"
             with open(repo_config_path, 'w') as f:
                 yaml.dump(self.repo_config_data, f, default_flow_style=False)
@@ -328,9 +328,21 @@ class Config:
         return self.get('pull_request.base_branch', 'main')
 
     @property
-    def pr_template_path(self) -> str:
-        """Get PR template path"""
-        return self.get('pull_request.template_path', 'templates/pr_template.md')
+    def pr_template(self) -> str:
+        """Get PR template content"""
+        default_template = """
+    # What this Pull Request does/why we need it
+
+    {jira_description}
+
+    ## What type of PR is this?
+
+    feature
+
+    ## Relevant links
+
+    * [{jira_id}]({jira_url})"""
+        return self.get('pull_request.template', default_template)
 
     @property
     def log_level(self) -> str:

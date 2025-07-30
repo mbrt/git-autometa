@@ -31,8 +31,20 @@ pull_request:
   # Default base branch for PRs
   base_branch: "main"
   
-  # Template file path (relative to project root or absolute path)
-  template_path: "templates/pr_template.md"
+  # Template for the pull request body.
+  # This can be a multi-line string.
+  template: |
+    # What this Pull Request does/why we need it
+
+    {jira_description}
+
+    ## What type of PR is this?
+
+    feature
+
+    ## Relevant links
+
+    * [{jira_id}]({jira_url})
 
 # Logging level (DEBUG, INFO, WARNING, ERROR)
 log_level: "INFO"
