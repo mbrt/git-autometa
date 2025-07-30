@@ -119,7 +119,7 @@ def cli(ctx, config, verbose):
         ctx.obj['config'] = Config(config)
         if verbose:
             console.print(
-                f"[dim]Loaded configuration from: {ctx.obj['config'].config_path}[/dim]")
+                f"[dim]{ctx.obj['config'].config_path_info}[/dim]")
     except Exception as e:
         console.print(f"[red]Error loading configuration: {e}[/red]")
         sys.exit(1)
@@ -144,7 +144,7 @@ def create(ctx, jira_issue, branch_only, pr_only, base_branch, no_draft, push):
         # JIRA client
         if not config.jira_server_url or not config.jira_email:
             console.print(
-                "[red]JIRA configuration missing. Run 'git-autometa config' first.[/red]")
+                "[red]JIRA configuration missing. Run 'git-autometa config global' first.[/red]")
             sys.exit(1)
 
         jira_client = JiraClient(config.jira_server_url, config.jira_email)
@@ -244,13 +244,20 @@ def create(ctx, jira_issue, branch_only, pr_only, base_branch, no_draft, push):
         sys.exit(1)
 
 
-@cli.command()
+@cli.group()
 @click.pass_context
 def config_cmd(ctx):
     """Configure git-autometa settings"""
+    pass
+
+
+@config_cmd.command('global')
+@click.pass_context
+def config_global(ctx):
+    """Configure global git-autometa settings"""
     config = ctx.obj['config']
 
-    console.print("[bold blue]Configuring git-autometa...[/bold blue]")
+    console.print("[bold blue]Configuring global git-autometa settings...[/bold blue]")
 
     # JIRA configuration
     console.print("\n[bold]JIRA Configuration[/bold]")
@@ -260,14 +267,14 @@ def config_cmd(ctx):
         f"JIRA Server URL",
         default=current_server if current_server else "https://your-company.atlassian.net"
     )
-    config.set('jira.server_url', server_url)
+    config.set_global('jira.server_url', server_url)
 
     current_email = config.jira_email
     email = click.prompt(
         f"JIRA Email",
         default=current_email if current_email else ""
     )
-    config.set('jira.email', email)
+    config.set_global('jira.email', email)
 
     # Get JIRA API token
     api_token = click.prompt("JIRA API Token", hide_input=True)
@@ -284,8 +291,144 @@ def config_cmd(ctx):
         console.print(f"[red]✗[/red] JIRA connection failed: {e}")
 
     # Save configuration
-    config.save()
-    console.print("[green]✓[/green] Configuration saved")
+    if config.custom_config_path:
+        config.save_custom()
+    else:
+        config.save_global()
+    console.print("[green]✓[/green] Global configuration saved")
+
+
+@config_cmd.command('repo')
+@click.pass_context
+def config_repo(ctx):
+    """Configure repository-specific git-autometa settings"""
+    config = ctx.obj['config']
+
+    # Check if we're in a git repository
+    repo_id = config.get_current_repo_id()
+    if not repo_id:
+        console.print("[red]Error: Not in a git repository with GitHub remote[/red]")
+        sys.exit(1)
+
+    console.print(f"[bold blue]Configuring settings for repository: {repo_id.replace('_', '/')}[/bold blue]")
+
+    # Show current effective configuration
+    console.print("\n[dim]Current effective configuration:[/dim]")
+    console.print(f"[dim]JIRA Server: {config.jira_server_url}[/dim]")
+    console.print(f"[dim]JIRA Email: {config.jira_email}[/dim]")
+    console.print(f"[dim]Branch Pattern: {config.branch_pattern}[/dim]")
+    console.print(f"[dim]PR Title Pattern: {config.pr_title_pattern}[/dim]")
+
+    console.print("\n[bold]Repository-specific overrides[/bold]")
+    console.print("[dim]Leave empty to use global defaults[/dim]")
+
+    # JIRA configuration overrides
+    console.print("\n[bold]JIRA Configuration[/bold]")
+    
+    server_url = click.prompt(
+        f"JIRA Server URL (current: {config.jira_server_url})",
+        default="",
+        show_default=False
+    )
+    if server_url:
+        config.set_repo('jira.server_url', server_url)
+
+    email = click.prompt(
+        f"JIRA Email (current: {config.jira_email})",
+        default="",
+        show_default=False
+    )
+    if email:
+        config.set_repo('jira.email', email)
+
+    # Git configuration overrides
+    console.print("\n[bold]Git Configuration[/bold]")
+    
+    branch_pattern = click.prompt(
+        f"Branch Pattern (current: {config.branch_pattern})",
+        default="",
+        show_default=False
+    )
+    if branch_pattern:
+        config.set_repo('git.branch_pattern', branch_pattern)
+
+    max_branch_length = click.prompt(
+        f"Max Branch Length (current: {config.max_branch_length})",
+        type=int,
+        default=0,
+        show_default=False
+    )
+    if max_branch_length > 0:
+        config.set_repo('git.max_branch_length', max_branch_length)
+
+    # Pull Request configuration overrides
+    console.print("\n[bold]Pull Request Configuration[/bold]")
+    
+    pr_title_pattern = click.prompt(
+        f"PR Title Pattern (current: {config.pr_title_pattern})",
+        default="",
+        show_default=False
+    )
+    if pr_title_pattern:
+        config.set_repo('pull_request.title_pattern', pr_title_pattern)
+
+    pr_draft = click.prompt(
+        f"Create Draft PRs (current: {config.pr_draft})",
+        type=bool,
+        default=None,
+        show_default=False
+    )
+    if pr_draft is not None:
+        config.set_repo('pull_request.draft', pr_draft)
+
+    pr_base_branch = click.prompt(
+        f"PR Base Branch (current: {config.pr_base_branch})",
+        default="",
+        show_default=False
+    )
+    if pr_base_branch:
+        config.set_repo('pull_request.base_branch', pr_base_branch)
+
+    # Save repository configuration
+    config.save_repo()
+    console.print("[green]✓[/green] Repository configuration saved")
+
+
+@config_cmd.command('show')
+@click.pass_context
+def config_show(ctx):
+    """Show current configuration"""
+    config = ctx.obj['config']
+
+    console.print("[bold blue]Current git-autometa Configuration[/bold blue]")
+
+    # Show configuration sources
+    console.print(f"\n[bold]Configuration Sources[/bold]")
+    console.print(config.config_path_info)
+
+    repo_id = config.get_current_repo_id()
+    if repo_id:
+        console.print(f"\nCurrent repository: {repo_id.replace('_', '/')}")
+
+    # Show effective configuration
+    console.print(f"\n[bold]Effective Configuration[/bold]")
+    
+    console.print("\n[bold]JIRA[/bold]")
+    console.print(f"Server URL: {config.jira_server_url or '[dim]Not set[/dim]'}")
+    console.print(f"Email: {config.jira_email or '[dim]Not set[/dim]'}")
+
+    console.print("\n[bold]Git[/bold]")
+    console.print(f"Branch Pattern: {config.branch_pattern}")
+    console.print(f"Max Branch Length: {config.max_branch_length}")
+
+    console.print("\n[bold]Pull Request[/bold]")
+    console.print(f"Title Pattern: {config.pr_title_pattern}")
+    console.print(f"Draft: {config.pr_draft}")
+    console.print(f"Base Branch: {config.pr_base_branch}")
+    console.print(f"Template Path: {config.pr_template_path}")
+
+    console.print("\n[bold]Logging[/bold]")
+    console.print(f"Log Level: {config.log_level}")
 
 
 @cli.command()
@@ -298,7 +441,7 @@ def status(ctx):
 
     # Configuration status
     console.print(f"\n[bold]Configuration[/bold]")
-    console.print(f"Config file: {config.config_path}")
+    console.print(config.config_path_info)
     console.print(
         f"JIRA Server: {config.jira_server_url or '[red]Not configured[/red]'}")
     console.print(

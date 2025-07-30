@@ -33,9 +33,9 @@ uv pip install -e .
 
 ## Quick Start
 
-1. **Configure git-autometa:**
+1. **Configure git-autometa globally:**
    ```bash
-   git-autometa config
+   git-autometa config global
    ```
    This will prompt you for:
    - JIRA server URL
@@ -79,8 +79,14 @@ git-autometa create JIRA-123 --base-branch develop
 ### Configuration Commands
 
 ```bash
-# Configure credentials and settings
-git-autometa config
+# Configure global settings (applies to all repositories)
+git-autometa config global
+
+# Configure repository-specific settings (overrides global)
+git-autometa config repo
+
+# Show current configuration and sources
+git-autometa config show
 
 # Show current status and configuration
 git-autometa status
@@ -91,15 +97,30 @@ git-autometa -v create JIRA-123
 
 ## Configuration
 
-git-autometa uses YAML configuration files. The tool looks for `config.yaml` in:
-1. Current directory
-2. Git repository root
-3. Package default location
+git-autometa uses a centralized configuration system that keeps configuration files outside of your repositories:
 
-### Example Configuration
+### Configuration Hierarchy
+
+1. **Command line arguments** (highest priority)
+2. **Repository-specific config** - `~/.config/git-autometa/repositories/{owner}_{repo}.yaml`
+3. **Global config** - `~/.config/git-autometa/config.yaml`
+4. **Built-in defaults** (lowest priority)
+
+### Configuration Structure
+
+```
+~/.config/git-autometa/
+├── config.yaml                    # Global defaults
+└── repositories/
+    ├── my-user_my-repo.yaml       # Repo-specific config
+    ├── company_project-api.yaml   # Another repo config
+    └── ...
+```
+
+### Global Configuration Example
 
 ```yaml
-# config.yaml
+# ~/.config/git-autometa/config.yaml
 jira:
   server_url: "https://your-company.atlassian.net"
   email: "your.email@company.com"
@@ -115,6 +136,30 @@ pull_request:
   template_path: "templates/pr_template.md"
 
 log_level: "INFO"
+```
+
+### Repository-Specific Configuration Example
+
+```yaml
+# ~/.config/git-autometa/repositories/my-user_my-repo.yaml
+# Only specify values you want to override from global config
+jira:
+  server_url: "https://different-jira.atlassian.net"  # Override global
+
+git:
+  branch_pattern: "bugfix/{jira_id}"  # Different pattern for this repo
+  max_branch_length: 40
+
+pull_request:
+  base_branch: "develop"  # This repo uses develop instead of main
+```
+
+### Custom Configuration Path
+
+You can also specify a custom configuration file path:
+
+```bash
+git-autometa --config /path/to/custom-config.yaml create PROJ-123
 ```
 
 ### Branch Naming Patterns
@@ -212,7 +257,7 @@ git-autometa create PROJ-123 \
 
 2. **JIRA API token issues:**
    ```bash
-   git-autometa config  # Re-configure JIRA credentials
+   git-autometa config global  # Re-configure JIRA credentials
    ```
 
 3. **Template not found:**
