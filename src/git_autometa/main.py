@@ -125,120 +125,110 @@ def cli(ctx, config, verbose):
         sys.exit(1)
 
 
-@cli.command()
+@cli.command("start-work")
 @click.argument('jira_issue')
-@click.option('--branch-only', is_flag=True, help='Only create branch, skip PR')
-@click.option('--pr-only', is_flag=True, help='Only create PR, skip branch creation')
-@click.option('--base-branch', help='Base branch for PR (overrides config)')
-@click.option('--no-draft', is_flag=True, help='Create PR as ready for review')
-@click.option('--push', is_flag=True, help='Push branch to remote')
+@click.option('--push', is_flag=True, help='Push branch to remote after creation')
 @click.pass_context
-def create(ctx, jira_issue, branch_only, pr_only, base_branch, no_draft, push):
-    """Create branch and/or PR for JIRA issue"""
+def start_work(ctx, jira_issue, push):
+    """Creates and checks out a new branch for a JIRA issue."""
     config = ctx.obj['config']
-
     try:
-        # Initialize clients
         console.print("[bold blue]Initializing clients...[/bold blue]")
-
-        # JIRA client
         if not config.jira_server_url or not config.jira_email:
             console.print(
                 "[red]JIRA configuration missing. Run 'git-autometa config global' first.[/red]")
             sys.exit(1)
-
         jira_client = JiraClient(config.jira_server_url, config.jira_email)
-
-        # GitHub client (only if creating PR)
-        github_client = None
-        if not branch_only:
-            github_client = GitHubClient()
-
-        # Git utils
         git_utils = GitUtils()
 
-        # Fetch JIRA issue
         console.print(
             f"[bold blue]Fetching JIRA issue: {jira_issue}[/bold blue]")
         issue = jira_client.get_issue(jira_issue)
         console.print(f"[green]✓[/green] Found issue: {issue.summary}")
 
-        branch_name = ""
+        console.print("[bold blue]Creating git branch...[/bold blue]")
+        branch_name = format_branch_name(
+            config.branch_pattern, issue, config.max_branch_length)
+        console.print(f"Branch name: {branch_name}")
 
-        # Create branch if requested
-        if not pr_only:
-            console.print("[bold blue]Creating git branch...[/bold blue]")
+        if git_utils.branch_exists(branch_name):
+            console.print(
+                f"[yellow]Branch '{branch_name}' already exists locally[/yellow]")
+            git_utils.checkout_branch(branch_name)
+        else:
+            git_utils.create_branch(branch_name, checkout=True)
+            console.print(
+                f"[green]✓[/green] Created and checked out branch: {branch_name}")
 
-            # Generate branch name
-            branch_name = format_branch_name(
-                config.branch_pattern,
-                issue,
-                config.max_branch_length
-            )
+        if push:
+            console.print(
+                "[bold blue]Pushing branch to remote...[/bold blue]")
+            git_utils.push_branch(branch_name)
+            console.print("[green]✓[/green] Pushed branch to remote")
 
-            console.print(f"Branch name: {branch_name}")
+        console.print(
+            "[bold green]✅ Branch is ready. Happy coding![/bold green]")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
 
-            # Check if branch already exists
-            if git_utils.branch_exists(branch_name):
-                console.print(
-                    f"[yellow]Branch '{branch_name}' already exists locally[/yellow]")
-                git_utils.checkout_branch(branch_name)
-            else:
-                # Create and checkout branch
-                git_utils.create_branch(branch_name, checkout=True)
-                console.print(
-                    f"[green]✓[/green] Created and checked out branch: {branch_name}")
 
-            # Push branch if requested
-            if push:
-                console.print(
-                    "[bold blue]Pushing branch to remote...[/bold blue]")
-                git_utils.push_branch(branch_name)
-                console.print(f"[green]✓[/green] Pushed branch to remote")
+@cli.command("create-pr")
+@click.option('--base-branch', help='Base branch for PR (overrides config)')
+@click.option('--no-draft', is_flag=True, help='Create PR as ready for review')
+@click.pass_context
+def create_pr(ctx, base_branch, no_draft):
+    """Creates a pull request for the current branch."""
+    config = ctx.obj['config']
+    try:
+        console.print("[bold blue]Initializing clients...[/bold blue]")
+        if not config.jira_server_url or not config.jira_email:
+            console.print(
+                "[red]JIRA configuration missing. Run 'git-autometa config global' first.[/red]")
+            sys.exit(1)
+        jira_client = JiraClient(config.jira_server_url, config.jira_email)
+        github_client = GitHubClient()
+        git_utils = GitUtils()
 
-        # Create PR if requested
-        if not branch_only:
-            console.print("[bold blue]Creating pull request...[/bold blue]")
+        branch_name = git_utils.get_current_branch()
+        console.print(f"Current branch: {branch_name}")
 
-            # Get current branch if not creating one
-            if not branch_name:
-                branch_name = git_utils.get_current_branch()
+        # Extract JIRA issue key from branch name
+        # This is a simple implementation, might need to be more robust
+        jira_issue_key = branch_name.split('/')[1].split('-')[0] + '-' + branch_name.split('/')[1].split('-')[1]
 
-            # Generate PR title
-            pr_title = config.pr_title_pattern.format(
-                jira_id=issue.key,
-                jira_title=issue.summary,
-                jira_type=issue.issue_type
-            )
+        console.print(
+            f"[bold blue]Fetching JIRA issue: {jira_issue_key}[/bold blue]")
+        issue = jira_client.get_issue(jira_issue_key)
+        console.print(f"[green]✓[/green] Found issue: {issue.summary}")
 
-            # Load PR template
-            pr_body = load_pr_template(config.pr_template_path, issue)
+        console.print("[bold blue]Creating pull request...[/bold blue]")
+        pr_title = config.pr_title_pattern.format(
+            jira_id=issue.key,
+            jira_title=issue.summary,
+            jira_type=issue.issue_type
+        )
+        pr_body = load_pr_template(config.pr_template_path, issue)
+        base = base_branch or config.pr_base_branch or github_client.get_default_branch()
+        draft = config.pr_draft and not no_draft
 
-            # Determine base branch
-            base = base_branch or config.pr_base_branch
-            if not base and github_client:
-                base = github_client.get_default_branch()
-            elif not base:
-                base = "main"  # Fallback
+        # Ensure the branch is pushed before creating the PR
+        if not git_utils.is_branch_pushed(branch_name):
+            console.print("[bold blue]Pushing branch to remote...[/bold blue]")
+            git_utils.push_branch(branch_name)
+            console.print("[green]✓[/green] Pushed branch to remote")
 
-            # Create PR
-            if github_client:
-                draft = config.pr_draft and not no_draft
-                pr_url = github_client.create_pull_request(
-                    title=pr_title,
-                    body=pr_body,
-                    head=branch_name,
-                    base=base,
-                    draft=draft
-                )
-            else:
-                raise ValueError("GitHub client not initialized")
-
-            console.print(f"[green]✓[/green] Created pull request: {pr_url}")
+        pr_url = github_client.create_pull_request(
+            title=pr_title,
+            body=pr_body,
+            head=branch_name,
+            base=base,
+            draft=draft
+        )
+        console.print(f"[green]✓[/green] Created pull request: {pr_url}")
 
         console.print(
             "[bold green]✅ Workflow completed successfully![/bold green]")
-
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)

@@ -22,13 +22,9 @@ A Python tool for automating JIRA-based git workflows. Automatically create bran
 ## Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd git-autometa
-
-# Install with uv
-uv sync
-uv pip install -e .
+# Clone and install with pipx
+git clone https://github.com/mbrt/git-autometa.git
+pipx install .
 ```
 
 ## Quick Start

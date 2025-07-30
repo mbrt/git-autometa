@@ -128,7 +128,7 @@ class GitHubClient:
             PR URL
         """
         try:
-            cmd = ['gh', 'pr', 'create', '--title', title, '--body', body]
+            cmd = ['gh', 'pr', 'create', '--title', title, '--body', body, '--head', head]
 
             if base:
                 cmd.extend(['--base', base])

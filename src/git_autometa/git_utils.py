@@ -133,6 +133,26 @@ class GitUtils:
         except IndexError:
             raise ValueError(f"Remote '{remote_name}' not found")
 
+    def is_branch_pushed(self, branch_name: str) -> bool:
+        """
+        Check if a branch has been pushed to the remote.
+
+        Args:
+            branch_name: The name of the branch to check.
+
+        Returns:
+            True if the branch has a remote tracking branch, False otherwise.
+        """
+        try:
+            branch = self.repo.heads[branch_name]
+            return branch.tracking_branch() is not None
+        except IndexError:
+            # Branch doesn't exist locally, so it can't be pushed
+            return False
+        except Exception as e:
+            logger.error(f"Error checking if branch {branch_name} is pushed: {e}")
+            return False
+
     def push_branch(self, branch_name: str, remote_name: str = "origin", set_upstream: bool = True):
         """
         Push branch to remote
