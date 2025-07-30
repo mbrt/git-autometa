@@ -1,0 +1,38 @@
+# Default configuration for git-autometa
+jira:
+  # JIRA server URL - configure this for your instance
+  server_url: "https://your-company.atlassian.net"
+  # Email associated with your JIRA account
+  email: ""
+
+github:
+  # GitHub organization/username (leave empty for personal repos)
+  owner: ""
+  # Default repository (can be overridden per project)
+  repo: ""
+
+git:
+  # Branch naming pattern. Available placeholders:
+  # {jira_id} - JIRA issue key (e.g., PROJ-123)
+  # {jira_title} - JIRA issue title (slugified)
+  # {jira_type} - JIRA issue type (e.g., feature, bug)
+  branch_pattern: "feature/{jira_id}-{jira_title}"
+  
+  # Maximum length for branch names
+  max_branch_length: 50
+
+pull_request:
+  # PR title pattern. Available placeholders same as above
+  title_pattern: "{jira_id}: {jira_title}"
+  
+  # Whether to create draft PRs by default
+  draft: true
+  
+  # Default base branch for PRs
+  base_branch: "main"
+  
+  # Template file path (relative to project root or absolute path)
+  template_path: "templates/pr_template.md"
+
+# Logging level (DEBUG, INFO, WARNING, ERROR)
+log_level: "INFO"
