@@ -57,6 +57,16 @@ def format_branch_name(pattern: str, issue: JiraIssue, max_length: int = 50) -> 
     return branch_name
 
 
+def prompt_with_default(text, current_value, **kwargs):
+    """Helper to prompt with a default value, allowing empty input to keep the current value."""
+    # The `default` parameter to `click.prompt` is what's returned when the user just presses Enter.
+    # By setting it to the current value, we achieve the desired behavior.
+    # `show_default=True` (the default) would show `[current_value]` after the prompt.
+    # We create a custom prompt text to make it more explicit.
+    prompt_text = f"{text} (current: {current_value})"
+    return click.prompt(prompt_text, default=current_value, show_default=False, **kwargs)
+
+
 @click.group()
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
@@ -271,74 +281,45 @@ def config_repo(ctx):
     console.print(f"[dim]PR Title Pattern: {config.pr_title_pattern}[/dim]")
 
     console.print("\n[bold]Repository-specific overrides[/bold]")
-    console.print("[dim]Leave empty to use global defaults[/dim]")
+    console.print("[dim]Press Enter to keep the current value[/dim]")
 
     # JIRA configuration overrides
     console.print("\n[bold]JIRA Configuration[/bold]")
     
-    server_url = click.prompt(
-        f"JIRA Server URL (current: {config.jira_server_url})",
-        default="",
-        show_default=False
-    )
-    if server_url:
-        config.set_repo('jira.server_url', server_url)
+    server_url = prompt_with_default("JIRA Server URL", config.jira_server_url)
+    config.set_repo('jira.server_url', server_url)
 
-    email = click.prompt(
-        f"JIRA Email (current: {config.jira_email})",
-        default="",
-        show_default=False
-    )
-    if email:
-        config.set_repo('jira.email', email)
+    email = prompt_with_default("JIRA Email", config.jira_email)
+    config.set_repo('jira.email', email)
 
     # Git configuration overrides
     console.print("\n[bold]Git Configuration[/bold]")
     
-    branch_pattern = click.prompt(
-        f"Branch Pattern (current: {config.branch_pattern})",
-        default="",
-        show_default=False
-    )
-    if branch_pattern:
-        config.set_repo('git.branch_pattern', branch_pattern)
+    branch_pattern = prompt_with_default("Branch Pattern", config.branch_pattern)
+    config.set_repo('git.branch_pattern', branch_pattern)
 
-    max_branch_length = click.prompt(
-        f"Max Branch Length (current: {config.max_branch_length})",
+    max_branch_length = prompt_with_default(
+        "Max Branch Length",
+        config.max_branch_length,
         type=int,
-        default=0,
-        show_default=False
     )
-    if max_branch_length > 0:
-        config.set_repo('git.max_branch_length', max_branch_length)
+    config.set_repo('git.max_branch_length', max_branch_length)
 
     # Pull Request configuration overrides
     console.print("\n[bold]Pull Request Configuration[/bold]")
     
-    pr_title_pattern = click.prompt(
-        f"PR Title Pattern (current: {config.pr_title_pattern})",
-        default="",
-        show_default=False
-    )
-    if pr_title_pattern:
-        config.set_repo('pull_request.title_pattern', pr_title_pattern)
+    pr_title_pattern = prompt_with_default("PR Title Pattern", config.pr_title_pattern)
+    config.set_repo('pull_request.title_pattern', pr_title_pattern)
 
-    pr_draft = click.prompt(
-        f"Create Draft PRs (current: {config.pr_draft})",
+    pr_draft = prompt_with_default(
+        "Create Draft PRs",
+        config.pr_draft,
         type=bool,
-        default=None,
-        show_default=False
     )
-    if pr_draft is not None:
-        config.set_repo('pull_request.draft', pr_draft)
+    config.set_repo('pull_request.draft', pr_draft)
 
-    pr_base_branch = click.prompt(
-        f"PR Base Branch (current: {config.pr_base_branch})",
-        default="",
-        show_default=False
-    )
-    if pr_base_branch:
-        config.set_repo('pull_request.base_branch', pr_base_branch)
+    pr_base_branch = prompt_with_default("PR Base Branch", config.pr_base_branch)
+    config.set_repo('pull_request.base_branch', pr_base_branch)
 
     # Save repository configuration
     config.save_repo()

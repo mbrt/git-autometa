@@ -33,7 +33,7 @@ pull_request:
   
   # Template for the pull request body.
   # This can be a multi-line string.
-  template: |
+  template: |-
     # What this Pull Request does/why we need it
 
     {jira_description}
