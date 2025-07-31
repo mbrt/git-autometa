@@ -255,6 +255,35 @@ class GitUtils:
             logger.error(f"Failed to fetch from remote {remote_name}: {e}")
             raise ValueError(f"Failed to fetch from remote: {e}")
 
+    def pull_branch(self, branch_name: str, remote_name: str = "origin"):
+        """
+        Pull latest changes for a specific branch
+
+        Args:
+            branch_name: Name of the branch to pull
+            remote_name: Name of the remote to pull from
+        """
+        try:
+            # Ensure we're on the target branch
+            current_branch = self.get_current_branch()
+            if current_branch != branch_name:
+                if self.branch_exists(branch_name):
+                    self.checkout_branch(branch_name)
+                elif self.remote_branch_exists(branch_name, remote_name):
+                    self.checkout_remote_branch(branch_name, remote_name)
+                    return  # checkout_remote_branch already gets latest
+                else:
+                    raise ValueError(f"Branch '{branch_name}' does not exist locally or remotely")
+
+            # Pull latest changes
+            remote = self.repo.remotes[remote_name]
+            remote.pull(branch_name)
+            logger.info(f"Pulled latest changes for branch {branch_name} from {remote_name}")
+            
+        except Exception as e:
+            logger.error(f"Failed to pull branch {branch_name}: {e}")
+            raise ValueError(f"Failed to pull branch: {e}")
+
     def remote_branch_exists(self, branch_name: str, remote_name: str = "origin") -> bool:
         """
         Check if branch exists on remote
@@ -396,9 +425,30 @@ class GitUtils:
         
         return self.generate_alternative_branch_name(base_name)
 
+    def _ensure_latest_main_branch(self):
+        """
+        Ensure we're on the latest version of the main branch
+
+        This method:
+        1. Determines the main branch name (main or master)
+        2. Switches to the main branch
+        3. Pulls the latest changes from remote
+        """
+        try:
+            main_branch = self.get_main_branch_name()
+            logger.info(f"Using main branch: {main_branch}")
+            
+            # Pull latest changes for the main branch
+            self.pull_branch(main_branch)
+            logger.info(f"Updated to latest {main_branch} branch")
+            
+        except Exception as e:
+            logger.error(f"Failed to ensure latest main branch: {e}")
+            raise ValueError(f"Failed to update main branch: {e}")
+
     def prepare_work_branch(self, base_branch_name: str) -> str:
         """
-        Prepare branch for work, handling conflicts with user prompts
+        Prepare branch for work, starting from latest main branch
 
         Args:
             base_branch_name: Desired branch name
@@ -412,10 +462,13 @@ class GitUtils:
         except:
             logger.warning("Failed to fetch remote - continuing with local information")
 
+        # Ensure we start from the latest main branch
+        self._ensure_latest_main_branch()
+
         local_exists = self.branch_exists(base_branch_name)
         remote_exists = self.remote_branch_exists(base_branch_name)
 
-        # Case 1: Neither exists - create new (current behavior)
+        # Case 1: Neither exists - create new from current main
         if not local_exists and not remote_exists:
             self.create_branch(base_branch_name, checkout=True)
             return base_branch_name

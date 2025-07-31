@@ -116,6 +116,7 @@ def start_work(ctx, jira_issue, push):
             config.branch_pattern, issue, config.max_branch_length)
         console.print(f"Desired branch name: {base_branch_name}")
 
+        console.print("[bold blue]Updating main branch...[/bold blue]")
         # Use the enhanced branch preparation that handles conflicts
         final_branch_name = git_utils.prepare_work_branch(base_branch_name)
         
