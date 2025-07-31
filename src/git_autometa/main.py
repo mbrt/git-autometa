@@ -112,23 +112,24 @@ def start_work(ctx, jira_issue, push):
         console.print(f"[green]✓[/green] Found issue: {issue.summary}")
 
         console.print("[bold blue]Creating git branch...[/bold blue]")
-        branch_name = format_branch_name(
+        base_branch_name = format_branch_name(
             config.branch_pattern, issue, config.max_branch_length)
-        console.print(f"Branch name: {branch_name}")
+        console.print(f"Desired branch name: {base_branch_name}")
 
-        if git_utils.branch_exists(branch_name):
+        # Use the enhanced branch preparation that handles conflicts
+        final_branch_name = git_utils.prepare_work_branch(base_branch_name)
+        
+        if final_branch_name == base_branch_name:
             console.print(
-                f"[yellow]Branch '{branch_name}' already exists locally[/yellow]")
-            git_utils.checkout_branch(branch_name)
+                f"[green]✓[/green] Created and checked out branch: {final_branch_name}")
         else:
-            git_utils.create_branch(branch_name, checkout=True)
             console.print(
-                f"[green]✓[/green] Created and checked out branch: {branch_name}")
+                f"[green]✓[/green] Using branch: {final_branch_name}")
 
         if push:
             console.print(
                 "[bold blue]Pushing branch to remote...[/bold blue]")
-            git_utils.push_branch(branch_name)
+            git_utils.push_branch(final_branch_name)
             console.print("[green]✓[/green] Pushed branch to remote")
 
         console.print(

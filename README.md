@@ -6,6 +6,7 @@ A Python tool for automating JIRA-based git workflows. Automatically create bran
 
 - 🎯 **Create git branches** from JIRA issues with configurable naming patterns
 - 🔄 **Generate pull requests** with JIRA metadata and custom templates
+- 🔀 **Multiple branch support** - handles local/remote conflicts intelligently
 - 🔐 **Secure credential management** using keyring for JIRA API tokens
 - 🎨 **Rich CLI interface** with colored output and progress indicators
 - ⚙️ **Highly configurable** with YAML configuration files
@@ -38,12 +39,17 @@ pipx install .
    - JIRA email
    - JIRA API token (stored securely in keyring)
 
-2. **Create a branch and PR for a JIRA issue:**
+2. **Create a branch for a JIRA issue:**
    ```bash
-   git-autometa create PROJ-123
+   git-autometa start-work PROJ-123
    ```
 
-3. **Check status:**
+3. **Create a pull request from current branch:**
+   ```bash
+   git-autometa create-pr
+   ```
+
+4. **Check status:**
    ```bash
    git-autometa status
    ```
@@ -53,23 +59,42 @@ pipx install .
 ### Main Commands
 
 ```bash
-# Create branch and PR for JIRA issue
-git-autometa create JIRA-123
-
-# Create only branch (skip PR)
-git-autometa create JIRA-123 --branch-only
-
-# Create only PR (from current branch)
-git-autometa create JIRA-123 --pr-only
+# Create and checkout branch for JIRA issue
+git-autometa start-work JIRA-123
 
 # Push branch to remote after creation
-git-autometa create JIRA-123 --push
+git-autometa start-work JIRA-123 --push
+
+# Create pull request from current branch
+git-autometa create-pr
 
 # Create non-draft PR
-git-autometa create JIRA-123 --no-draft
+git-autometa create-pr --no-draft
 
-# Use custom base branch
-git-autometa create JIRA-123 --base-branch develop
+# Use custom base branch for PR
+git-autometa create-pr --base-branch develop
+```
+
+### Multiple Branch Support
+
+The `start-work` command intelligently handles branch conflicts:
+
+When a branch already exists (locally, remotely, or both), you'll be prompted to choose:
+1. **Switch to existing branch** - Checkout the existing branch
+2. **Create alternative branch** - Auto-generate a new name (e.g., `feature/PROJ-123-fix-bug-2`)
+
+This enables multiple developers to work on the same JIRA issue with separate branches.
+
+**Example scenarios:**
+```bash
+# First time - creates feature/PROJ-123-fix-bug
+git-autometa start-work PROJ-123
+
+# Later, same issue - prompts for action
+git-autometa start-work PROJ-123
+# Output: Branch 'feature/PROJ-123-fix-bug' already exists locally
+# Choose: 1) Switch to existing branch  2) Create new branch with alternative name
+# Choosing 2 creates: feature/PROJ-123-fix-bug-2
 ```
 
 ### Configuration Commands
@@ -88,7 +113,7 @@ git-autometa config show
 git-autometa status
 
 # Enable verbose logging
-git-autometa -v create JIRA-123
+git-autometa -v start-work JIRA-123
 ```
 
 ## Configuration
@@ -208,38 +233,46 @@ Available template placeholders:
 
 ### Basic Workflow
 ```bash
-# 1. Create branch and PR
-git-autometa create PROJ-123
+# 1. Create and checkout branch
+git-autometa start-work PROJ-123
 
 # 2. Make your changes
 git add .
 git commit -m "Fix login validation"
 
-# 3. Push changes (branch already exists remotely)
-git push
-```
-
-### Branch-only Workflow
-```bash
-# 1. Create branch only
-git-autometa create PROJ-123 --branch-only
-
-# 2. Make changes and push
-git add .
-git commit -m "Fix login validation"
+# 3. Push changes
 git push -u origin feature/PROJ-123-fix-login-bug
 
-# 3. Create PR later
-git-autometa create PROJ-123 --pr-only
+# 4. Create pull request
+git-autometa create-pr
 ```
 
-### Custom Workflow
+### Multiple Developers on Same Issue
 ```bash
-# Create ready-for-review PR on develop branch
-git-autometa create PROJ-123 \
-  --base-branch develop \
-  --no-draft \
-  --push
+# Developer 1
+git-autometa start-work PROJ-123
+# Creates: feature/PROJ-123-fix-login-bug
+
+# Developer 2 (later)
+git-autometa start-work PROJ-123
+# Prompts: Branch exists remotely. Choose:
+# 1) Switch to existing branch
+# 2) Create alternative branch
+# Choosing 2 creates: feature/PROJ-123-fix-login-bug-2
+```
+
+### Push and Create PR Workflow
+```bash
+# 1. Create branch with immediate push
+git-autometa start-work PROJ-123 --push
+
+# 2. Make changes
+git add .
+git commit -m "Fix login validation"
+git push
+
+# 3. Create ready-for-review PR
+git-autometa create-pr --no-draft --base-branch develop
 ```
 
 ## Troubleshooting
@@ -268,7 +301,7 @@ git-autometa create PROJ-123 \
 
 Enable verbose logging for troubleshooting:
 ```bash
-git-autometa -v create PROJ-123
+git-autometa -v start-work PROJ-123
 ```
 
 ## Development
