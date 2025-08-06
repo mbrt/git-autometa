@@ -2,6 +2,8 @@
 
 A Python tool for automating JIRA-based git workflows. Automatically create branches and pull requests based on JIRA issue information.
 
+This is almost entirely vibe-coded, so it's pretty bad (but it works)!
+
 ## Features
 
 - 🎯 **Create git branches** from JIRA issues with configurable naming patterns
@@ -41,7 +43,11 @@ pipx install .
 
 2. **Create a branch for a JIRA issue:**
    ```bash
+   # Start work on a specific issue
    git-autometa start-work PROJ-123
+   
+   # Or interactively select from your assigned issues
+   git-autometa start-work
    ```
 
 3. **Create a pull request from current branch:**
@@ -62,6 +68,9 @@ pipx install .
 # Create and checkout branch for JIRA issue
 git-autometa start-work JIRA-123
 
+# Interactive mode - select from your assigned issues
+git-autometa start-work
+
 # Push branch to remote after creation
 git-autometa start-work JIRA-123 --push
 
@@ -74,6 +83,46 @@ git-autometa create-pr --no-draft
 # Use custom base branch for PR
 git-autometa create-pr --base-branch develop
 ```
+
+### Interactive Issue Selection
+
+When you run `git-autometa start-work` without specifying an issue, the tool will:
+
+1. **Fetch your assigned issues** from JIRA (up to 15, with most recently updated last)
+2. **Display a numbered list** with issue keys, summaries, status, and type
+3. **Let you select** by entering the corresponding number
+4. **Continue with normal workflow** using the selected issue
+
+**Example interaction:**
+```bash
+$ git-autometa start-work
+✨ Initializing clients...
+🔍 Fetching your assigned issues...
+
+Found 5 assigned issues:
+
+ 1. PROJ-123: Fix login validation error when password contains special chars...
+    Status: In Progress Type: Bug
+
+ 2. PROJ-124: Add support for OAuth2 authentication
+    Status: To Do Type: Feature
+
+ 3. PROJ-125: Update user profile page design
+    Status: In Progress Type: Task
+
+ 4. PROJ-126: Investigate performance issues in search functionality
+    Status: To Do Type: Bug
+
+ 5. PROJ-127: Write documentation for new API endpoints
+    Status: To Do Type: Task
+
+ 0. Cancel
+
+Select an issue: 2
+✅ Selected: PROJ-124 - Add support for OAuth2 authentication
+```
+
+If no issues are found or there's a connection error, the tool gracefully falls back to manual issue entry.
 
 ### Multiple Branch Support
 

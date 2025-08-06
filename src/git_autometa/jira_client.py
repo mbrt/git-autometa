@@ -6,7 +6,7 @@ import requests
 import keyring
 import logging
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from urllib.parse import urljoin
 
 from .jira_markdown_converter import convert_jira_to_markdown
@@ -145,6 +145,50 @@ class JiraClient:
         except Exception as e:
             logger.error(f"JIRA connection test failed: {e}")
             return False
+
+    def search_my_issues(self, limit: int = 15) -> List[JiraIssue]:
+        """
+        Search for issues assigned to the current user
+
+        Args:
+            limit: Maximum number of issues to return
+
+        Returns:
+            List of JiraIssue objects ordered by update date (oldest first, most recent last)
+
+        Raises:
+            ValueError: If search fails
+        """
+        try:
+            # JQL to find issues assigned to current user, ordered by oldest first (most recent last)
+            jql = "assignee = currentUser() ORDER BY updated ASC"
+            
+            url = urljoin(self.server_url, '/rest/api/2/search')
+            params = {
+                'jql': jql,
+                'maxResults': limit,
+                'fields': 'summary,description,issuetype,status,assignee'
+            }
+            
+            response = self.session.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            issues = []
+            for issue_data in data.get('issues', []):
+                issue = JiraIssue(issue_data)
+                issue.set_url(self.server_url)
+                issues.append(issue)
+            
+            logger.info(f"Found {len(issues)} issues assigned to current user")
+            return issues
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error searching JIRA issues: {e}")
+            raise ValueError(f"Failed to search JIRA issues: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error searching JIRA issues: {e}")
+            raise
 
     def get_issue(self, issue_key: str) -> JiraIssue:
         """

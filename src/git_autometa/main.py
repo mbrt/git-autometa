@@ -67,6 +67,75 @@ def prompt_with_default(text, current_value, **kwargs):
     return click.prompt(prompt_text, default=current_value, show_default=False, **kwargs)
 
 
+def select_jira_issue_interactively(jira_client: JiraClient) -> str:
+    """
+    Display an interactive list of assigned JIRA issues and return the selected issue key.
+    
+    Args:
+        jira_client: Initialized JIRA client
+        
+    Returns:
+        Selected JIRA issue key
+        
+    Raises:
+        click.Abort: If user cancels selection
+    """
+    console.print("[bold blue]Fetching your assigned issues...[/bold blue]")
+    
+    try:
+        issues = jira_client.search_my_issues()
+    except Exception as e:
+        console.print(f"[red]Error fetching issues: {e}[/red]")
+        console.print("[yellow]Falling back to manual issue entry...[/yellow]")
+        return click.prompt("Enter JIRA issue key")
+    
+    if not issues:
+        console.print("[yellow]No issues found assigned to you.[/yellow]")
+        console.print("[yellow]Falling back to manual issue entry...[/yellow]")
+        return click.prompt("Enter JIRA issue key")
+    
+    console.print(f"\n[bold]Found {len(issues)} assigned issues:[/bold]")
+    console.print()
+    
+    # Display numbered list of issues
+    for i, issue in enumerate(issues, 1):
+        # Truncate summary if too long
+        summary = issue.summary
+        if len(summary) > 60:
+            summary = summary[:57] + "..."
+        
+        status_color = "green" if issue.status.lower() in ["in progress", "doing"] else "blue"
+        console.print(f"[dim]{i:2}.[/dim] [bold]{issue.key}[/bold]: {summary}")
+        console.print(f"    [dim]Status:[/dim] [{status_color}]{issue.status}[/{status_color}] [dim]Type:[/dim] {issue.issue_type.title()}")
+        console.print()
+    
+    console.print("[dim]0.[/dim] [italic]Cancel[/italic]")
+    console.print()
+    
+    # Get user selection
+    while True:
+        try:
+            choice = click.prompt(
+                "Select an issue", 
+                type=int,
+                show_default=False
+            )
+            
+            if choice == 0:
+                console.print("[yellow]Cancelled[/yellow]")
+                raise click.Abort()
+            elif 1 <= choice <= len(issues):
+                selected_issue = issues[choice - 1]
+                console.print(f"[green]Selected:[/green] {selected_issue.key} - {selected_issue.summary}")
+                return selected_issue.key
+            else:
+                console.print(f"[red]Invalid choice. Please select a number between 0 and {len(issues)}[/red]")
+        except click.Abort:
+            raise
+        except (ValueError, click.BadParameter):
+            console.print(f"[red]Invalid input. Please enter a number between 0 and {len(issues)}[/red]")
+
+
 @click.group()
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
@@ -91,11 +160,14 @@ def cli(ctx, config, verbose):
 
 
 @cli.command("start-work")
-@click.argument('jira_issue')
+@click.argument('jira_issue', required=False)
 @click.option('--push', is_flag=True, help='Push branch to remote after creation')
 @click.pass_context
 def start_work(ctx, jira_issue, push):
-    """Creates and checks out a new branch for a JIRA issue."""
+    """Creates and checks out a new branch for a JIRA issue.
+    
+    If no JIRA issue is provided, shows an interactive list of your assigned issues.
+    """
     config = ctx.obj['config']
     try:
         console.print("[bold blue]Initializing clients...[/bold blue]")
@@ -105,6 +177,14 @@ def start_work(ctx, jira_issue, push):
             sys.exit(1)
         jira_client = JiraClient(config.jira_server_url, config.jira_email)
         git_utils = GitUtils()
+
+        # If no issue provided, show interactive selection
+        if not jira_issue:
+            try:
+                jira_issue = select_jira_issue_interactively(jira_client)
+            except click.Abort:
+                console.print("[yellow]Operation cancelled[/yellow]")
+                sys.exit(0)
 
         console.print(
             f"[bold blue]Fetching JIRA issue: {jira_issue}[/bold blue]")
