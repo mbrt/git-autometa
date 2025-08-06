@@ -9,6 +9,8 @@ import re
 from typing import Dict, Any, Optional
 from urllib.parse import urljoin
 
+from .jira_markdown_converter import convert_jira_to_markdown
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,6 +34,12 @@ class JiraIssue:
     def description(self) -> str:
         """Issue description"""
         return self.data.get('fields', {}).get('description', '')
+
+    @property
+    def description_markdown(self) -> str:
+        """Issue description converted to Markdown"""
+        raw_description = self.description
+        return convert_jira_to_markdown(raw_description)
 
     @property
     def issue_type(self) -> str:

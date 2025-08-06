@@ -4,6 +4,7 @@ Git operations for git-autometa
 
 import subprocess
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 import click
@@ -519,3 +520,56 @@ class GitUtils:
             click.echo(f"Creating alternative branch: {alternative_name}")
             self.create_branch(alternative_name, checkout=True)
             return alternative_name
+
+    def get_commit_messages_for_pr(self, base_branch: str) -> str:
+        """
+        Get formatted commit messages for commits that will be included in the PR
+
+        Args:
+            base_branch: The base branch to compare against
+
+        Returns:
+            Formatted string of commit messages as bulleted list
+        """
+        try:
+            current_branch = self.get_current_branch()
+            
+            # Get commits that are in current branch but not in base branch
+            commit_range = f"{base_branch}..{current_branch}"
+            
+            # Get commit messages using git log
+            result = subprocess.run([
+                'git', 'log', 
+                '--pretty=format:%s',  # Just the subject line
+                '--reverse',           # Show oldest first
+                commit_range
+            ], capture_output=True, text=True, cwd=self.repo.working_dir)
+            
+            if result.returncode != 0:
+                logger.warning(f"Failed to get commit messages: {result.stderr}")
+                return ""
+            
+            commit_messages = result.stdout.strip()
+            if not commit_messages:
+                logger.info("No commits found for PR")
+                return ""
+            
+            # Format as bulleted list and remove JIRA tags
+            formatted_messages = []
+            # Pattern to match JIRA tags like [ABC-123] at the beginning of commit messages
+            jira_tag_pattern = r'^\[([A-Z]+-\d+)\]\s*'
+            
+            for message in commit_messages.split('\n'):
+                if message.strip():  # Skip empty lines
+                    # Remove JIRA tag if present
+                    cleaned_message = re.sub(jira_tag_pattern, '', message.strip())
+                    formatted_messages.append(f"* {cleaned_message}")
+            
+            if formatted_messages:
+                return '\n'.join(formatted_messages)
+            else:
+                return ""
+                
+        except Exception as e:
+            logger.error(f"Error getting commit messages for PR: {e}")
+            return ""

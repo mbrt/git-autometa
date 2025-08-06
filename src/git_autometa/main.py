@@ -175,14 +175,20 @@ def create_pr(ctx, base_branch, no_draft):
             jira_title=issue.summary,
             jira_type=issue.issue_type
         )
+        
+        base = base_branch or config.pr_base_branch or github_client.get_default_branch()
+        
+        # Get commit messages for PR
+        commit_messages = git_utils.get_commit_messages_for_pr(base)
+        
         pr_body = config.pr_template.format(
             jira_id=issue.key,
             jira_title=issue.summary,
-            jira_description=issue.description or "See JIRA issue for details.",
+            jira_description=issue.description_markdown or "See JIRA issue for details.",
             jira_url=issue.url,
-            jira_type=issue.issue_type
+            jira_type=issue.issue_type,
+            commit_messages=commit_messages
         )
-        base = base_branch or config.pr_base_branch or github_client.get_default_branch()
         draft = config.pr_draft and not no_draft
 
         # Ensure the branch is pushed before creating the PR

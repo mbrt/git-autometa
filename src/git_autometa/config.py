@@ -335,6 +335,8 @@ class Config:
 
     {jira_description}
 
+    {commit_messages}
+
     ## What type of PR is this?
 
     feature
