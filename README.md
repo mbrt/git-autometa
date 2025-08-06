@@ -2,7 +2,9 @@
 
 A Python tool for automating JIRA-based git workflows. Automatically create branches and pull requests based on JIRA issue information.
 
-This is almost entirely vibe-coded, so it's pretty bad (but it works)!
+> [!CAUTION]
+> This is almost entirely vibe-coded, so the code is pretty bad (but it seems to work)!
+> Use at your own risk.
 
 ## Features
 
