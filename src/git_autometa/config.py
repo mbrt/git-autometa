@@ -27,7 +27,7 @@ class Config:
         self.config_data = {}
         self.repo_config_data = {}
         self.custom_config_path = config_path
-        
+
         if config_path:
             # Use custom config path if provided
             self.config_path = Path(config_path)
@@ -48,7 +48,7 @@ class Config:
     def _get_repo_identifier(self) -> Optional[str]:
         """
         Get repository identifier from git remote origin
-        
+
         Returns:
             Repository identifier in format 'owner_repo' or None if not a git repo
         """
@@ -63,10 +63,10 @@ class Config:
     def _parse_github_repo_from_url(self, url: str) -> Optional[str]:
         """
         Parse GitHub repository owner/repo from various URL formats
-        
+
         Args:
             url: Git remote URL (HTTPS or SSH)
-            
+
         Returns:
             Repository identifier in format 'owner_repo' or None
         """
@@ -75,7 +75,7 @@ class Config:
         if ssh_match:
             owner, repo = ssh_match.groups()
             return f"{owner}_{repo}"
-        
+
         # Handle HTTPS URLs: https://github.com/owner/repo.git
         try:
             parsed = urlparse(url)
@@ -87,7 +87,7 @@ class Config:
                     return f"{owner}_{repo}"
         except Exception:
             pass
-        
+
         logger.warning(f"Could not parse GitHub repository from URL: {url}")
         return None
 
@@ -109,7 +109,7 @@ class Config:
         """Load configuration from centralized system"""
         # Load global config
         self._load_global_config()
-        
+
         # Load repository-specific config if in a git repository
         repo_id = self._get_repo_identifier()
         if repo_id:
@@ -148,7 +148,7 @@ class Config:
     def get(self, key: str, default: Any = None) -> Any:
         """
         Get configuration value using dot notation with hierarchy resolution
-        
+
         Priority order:
         1. Repository-specific config
         2. Global config
@@ -208,7 +208,7 @@ class Config:
         repo_id = self._get_repo_identifier()
         if not repo_id:
             raise ValueError("Not in a git repository with GitHub remote")
-        
+
         self._set_nested_value(self.repo_config_data, key, value)
 
     def _set_nested_value(self, data: Dict[str, Any], key: str, value: Any):
@@ -254,7 +254,7 @@ class Config:
         """Save configuration to custom path (if using custom config)"""
         if not self.custom_config_path:
             raise ValueError("No custom config path specified")
-        
+
         try:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.config_path, 'w') as f:
@@ -272,13 +272,13 @@ class Config:
         """Get information about configuration paths being used"""
         if self.custom_config_path:
             return f"Custom: {self.config_path}"
-        
+
         info = f"Global: {self.global_config_path}"
         repo_id = self._get_repo_identifier()
         if repo_id:
             repo_config_path = self.config_dir / "repositories" / f"{repo_id}.yaml"
             info += f"\nRepository: {repo_config_path}"
-        
+
         return info
 
     # Convenience properties for common config values

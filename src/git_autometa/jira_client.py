@@ -154,35 +154,35 @@ class JiraClient:
             limit: Maximum number of issues to return
 
         Returns:
-            List of JiraIssue objects ordered by update date (oldest first, most recent last)
+            List of JiraIssue objects ordered by update date (most recent first)
 
         Raises:
             ValueError: If search fails
         """
         try:
-            # JQL to find issues assigned to current user, ordered by oldest first (most recent last)
-            jql = "assignee = currentUser() ORDER BY updated ASC"
-            
+            # JQL to find issues assigned to current user, ordered by most recent first
+            jql = "assignee = currentUser() ORDER BY updated DESC"
+
             url = urljoin(self.server_url, '/rest/api/2/search')
             params = {
                 'jql': jql,
                 'maxResults': limit,
                 'fields': 'summary,description,issuetype,status,assignee'
             }
-            
+
             response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
-            
+
             issues = []
             for issue_data in data.get('issues', []):
                 issue = JiraIssue(issue_data)
                 issue.set_url(self.server_url)
                 issues.append(issue)
-            
+
             logger.info(f"Found {len(issues)} issues assigned to current user")
             return issues
-            
+
         except requests.exceptions.RequestException as e:
             logger.error(f"Error searching JIRA issues: {e}")
             raise ValueError(f"Failed to search JIRA issues: {e}")

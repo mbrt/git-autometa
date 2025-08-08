@@ -70,48 +70,52 @@ def prompt_with_default(text, current_value, **kwargs):
 def select_jira_issue_interactively(jira_client: JiraClient) -> str:
     """
     Display an interactive list of assigned JIRA issues and return the selected issue key.
-    
+
     Args:
         jira_client: Initialized JIRA client
-        
+
     Returns:
         Selected JIRA issue key
-        
+
     Raises:
         click.Abort: If user cancels selection
     """
     console.print("[bold blue]Fetching your assigned issues...[/bold blue]")
-    
+
     try:
         issues = jira_client.search_my_issues()
     except Exception as e:
         console.print(f"[red]Error fetching issues: {e}[/red]")
         console.print("[yellow]Falling back to manual issue entry...[/yellow]")
         return click.prompt("Enter JIRA issue key")
-    
+
     if not issues:
         console.print("[yellow]No issues found assigned to you.[/yellow]")
         console.print("[yellow]Falling back to manual issue entry...[/yellow]")
         return click.prompt("Enter JIRA issue key")
-    
+
     console.print(f"\n[bold]Found {len(issues)} assigned issues:[/bold]")
     console.print()
-    
+
+    # Invert the list of issues, so that the most recent issue is displayed at
+    # the bottom.
+    issues.reverse()
+
     # Display numbered list of issues
-    for i, issue in enumerate(issues, 1):
+    for i, issue in enumerate(issues):
         # Truncate summary if too long
         summary = issue.summary
         if len(summary) > 60:
             summary = summary[:57] + "..."
-        
+
         status_color = "green" if issue.status.lower() in ["in progress", "doing"] else "blue"
-        console.print(f"[dim]{i:2}.[/dim] [bold]{issue.key}[/bold]: {summary}")
+        console.print(f"[dim]{i+1:2}.[/dim] [bold]{issue.key}[/bold]: {summary}")
         console.print(f"    [dim]Status:[/dim] [{status_color}]{issue.status}[/{status_color}] [dim]Type:[/dim] {issue.issue_type.title()}")
         console.print()
-    
+
     console.print("[dim]0.[/dim] [italic]Cancel[/italic]")
     console.print()
-    
+
     # Get user selection
     while True:
         try:
@@ -120,7 +124,7 @@ def select_jira_issue_interactively(jira_client: JiraClient) -> str:
                 type=int,
                 show_default=False
             )
-            
+
             if choice == 0:
                 console.print("[yellow]Cancelled[/yellow]")
                 raise click.Abort()
@@ -165,7 +169,7 @@ def cli(ctx, config, verbose):
 @click.pass_context
 def start_work(ctx, jira_issue, push):
     """Creates and checks out a new branch for a JIRA issue.
-    
+
     If no JIRA issue is provided, shows an interactive list of your assigned issues.
     """
     config = ctx.obj['config']
@@ -199,7 +203,7 @@ def start_work(ctx, jira_issue, push):
         console.print("[bold blue]Updating main branch...[/bold blue]")
         # Use the enhanced branch preparation that handles conflicts
         final_branch_name = git_utils.prepare_work_branch(base_branch_name)
-        
+
         if final_branch_name == base_branch_name:
             console.print(
                 f"[green]✓[/green] Created and checked out branch: {final_branch_name}")
@@ -255,12 +259,12 @@ def create_pr(ctx, base_branch, no_draft):
             jira_title=issue.summary,
             jira_type=issue.issue_type
         )
-        
+
         base = base_branch or config.pr_base_branch or github_client.get_default_branch()
-        
+
         # Get commit messages for PR
         commit_messages = git_utils.get_commit_messages_for_pr(base)
-        
+
         pr_body = config.pr_template.format(
             jira_id=issue.key,
             jira_title=issue.summary,
@@ -373,7 +377,7 @@ def config_repo(ctx):
 
     # JIRA configuration overrides
     console.print("\n[bold]JIRA Configuration[/bold]")
-    
+
     server_url = prompt_with_default("JIRA Server URL", config.jira_server_url)
     config.set_repo('jira.server_url', server_url)
 
@@ -382,7 +386,7 @@ def config_repo(ctx):
 
     # Git configuration overrides
     console.print("\n[bold]Git Configuration[/bold]")
-    
+
     branch_pattern = prompt_with_default("Branch Pattern", config.branch_pattern)
     config.set_repo('git.branch_pattern', branch_pattern)
 
@@ -395,7 +399,7 @@ def config_repo(ctx):
 
     # Pull Request configuration overrides
     console.print("\n[bold]Pull Request Configuration[/bold]")
-    
+
     pr_title_pattern = prompt_with_default("PR Title Pattern", config.pr_title_pattern)
     config.set_repo('pull_request.title_pattern', pr_title_pattern)
 
@@ -432,7 +436,7 @@ def config_show(ctx):
 
     # Show effective configuration
     console.print(f"\n[bold]Effective Configuration[/bold]")
-    
+
     console.print("\n[bold]JIRA[/bold]")
     console.print(f"Server URL: {config.jira_server_url or '[dim]Not set[/dim]'}")
     console.print(f"Email: {config.jira_email or '[dim]Not set[/dim]'}")

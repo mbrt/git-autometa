@@ -280,7 +280,7 @@ class GitUtils:
             remote = self.repo.remotes[remote_name]
             remote.pull(branch_name)
             logger.info(f"Pulled latest changes for branch {branch_name} from {remote_name}")
-            
+
         except Exception as e:
             logger.error(f"Failed to pull branch {branch_name}: {e}")
             raise ValueError(f"Failed to pull branch: {e}")
@@ -299,7 +299,7 @@ class GitUtils:
         try:
             remote = self.repo.remotes[remote_name]
             remote_branch_name = f"{remote_name}/{branch_name}"
-            
+
             # Check if remote branch exists in references
             for ref in remote.refs:
                 if ref.name == remote_branch_name:
@@ -345,11 +345,11 @@ class GitUtils:
             # First try 'main'
             if self.branch_exists('main'):
                 return 'main'
-            
+
             # Fallback to 'master'
             if self.branch_exists('master'):
                 return 'master'
-            
+
             # Check remote branches
             try:
                 if self.remote_branch_exists('main'):
@@ -358,7 +358,7 @@ class GitUtils:
                     return 'master'
             except:
                 pass
-            
+
             # Default fallback
             return 'main'
 
@@ -383,7 +383,7 @@ class GitUtils:
             new_branch = self.repo.create_head(branch_name, remote_ref)
             new_branch.set_tracking_branch(self.repo.remotes[remote_name].refs[branch_name])
             new_branch.checkout()
-            
+
             logger.info(f"Checked out remote branch: {branch_name}")
 
         except Exception as e:
@@ -406,7 +406,7 @@ class GitUtils:
             if not self.branch_exists(alternative_name) and not self.remote_branch_exists(alternative_name):
                 return alternative_name
             counter += 1
-            
+
             # Safety check to prevent infinite loop
             if counter > 100:
                 raise ValueError("Too many branch name conflicts - unable to generate alternative")
@@ -423,7 +423,7 @@ class GitUtils:
         """
         if not self.branch_exists(base_name) and not self.remote_branch_exists(base_name):
             return base_name
-        
+
         return self.generate_alternative_branch_name(base_name)
 
     def _ensure_latest_main_branch(self):
@@ -438,11 +438,11 @@ class GitUtils:
         try:
             main_branch = self.get_main_branch_name()
             logger.info(f"Using main branch: {main_branch}")
-            
+
             # Pull latest changes for the main branch
             self.pull_branch(main_branch)
             logger.info(f"Updated to latest {main_branch} branch")
-            
+
         except Exception as e:
             logger.error(f"Failed to ensure latest main branch: {e}")
             raise ValueError(f"Failed to update main branch: {e}")
@@ -498,12 +498,12 @@ class GitUtils:
             location = "remotely"
 
         click.echo(f"\n[yellow]Branch '{branch_name}' already exists {location}[/yellow]")
-        
+
         # Show options
         click.echo("\nChoose an action:")
         click.echo("1. Switch to existing branch")
         click.echo("2. Create new branch with alternative name")
-        
+
         choice = click.prompt("Enter your choice", type=click.Choice(['1', '2']))
 
         if choice == '1':
@@ -533,10 +533,10 @@ class GitUtils:
         """
         try:
             current_branch = self.get_current_branch()
-            
+
             # Get commits that are in current branch but not in base branch
             commit_range = f"{base_branch}..{current_branch}"
-            
+
             # Get commit messages using git log
             result = subprocess.run([
                 'git', 'log', 
@@ -544,32 +544,32 @@ class GitUtils:
                 '--reverse',           # Show oldest first
                 commit_range
             ], capture_output=True, text=True, cwd=self.repo.working_dir)
-            
+
             if result.returncode != 0:
                 logger.warning(f"Failed to get commit messages: {result.stderr}")
                 return ""
-            
+
             commit_messages = result.stdout.strip()
             if not commit_messages:
                 logger.info("No commits found for PR")
                 return ""
-            
+
             # Format as bulleted list and remove JIRA tags
             formatted_messages = []
             # Pattern to match JIRA tags like [ABC-123] at the beginning of commit messages
             jira_tag_pattern = r'^\[([A-Z]+-\d+)\]\s*'
-            
+
             for message in commit_messages.split('\n'):
                 if message.strip():  # Skip empty lines
                     # Remove JIRA tag if present
                     cleaned_message = re.sub(jira_tag_pattern, '', message.strip())
                     formatted_messages.append(f"* {cleaned_message}")
-            
+
             if formatted_messages:
                 return '\n'.join(formatted_messages)
             else:
                 return ""
-                
+
         except Exception as e:
             logger.error(f"Error getting commit messages for PR: {e}")
             return ""
