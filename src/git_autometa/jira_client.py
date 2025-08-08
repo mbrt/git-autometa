@@ -160,8 +160,8 @@ class JiraClient:
             ValueError: If search fails
         """
         try:
-            # JQL to find issues assigned to current user, ordered by most recent first
-            jql = "assignee = currentUser() ORDER BY updated DESC"
+            # JQL to find issues assigned to current user excluding Done category, ordered by most recent first
+            jql = "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
 
             url = urljoin(self.server_url, '/rest/api/2/search')
             params = {
