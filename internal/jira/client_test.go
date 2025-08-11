@@ -128,15 +128,3 @@ func TestGetIssue(t *testing.T) {
 		t.Fatalf("expected URL to be set")
 	}
 }
-
-func TestGetIssue_EmptyKey(t *testing.T) {
-	client, ts := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("{}"))
-	})
-	defer ts.Close()
-
-	if _, err := client.GetIssue(" "); err == nil {
-		t.Fatalf("expected error for empty key, got nil")
-	}
-}

@@ -36,7 +36,7 @@ func NewClient(cfg appconfig.Config, token string) Client {
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
-		token: strings.TrimSpace(token),
+		token: token,
 	}
 }
 
@@ -68,7 +68,7 @@ func (c Client) TestConnection() error {
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
-		return fmt.Errorf("jira: test connection failed: %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		return fmt.Errorf("jira: test connection failed: %s: %s", resp.Status, string(body))
 	}
 	return nil
 }
@@ -91,7 +91,7 @@ func (c Client) SearchMyIssues(limit int) ([]Issue, error) {
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
-		return nil, fmt.Errorf("jira: search issues failed: %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		return nil, fmt.Errorf("jira: search issues failed: %s: %s", resp.Status, string(body))
 	}
 
 	var payload struct {
@@ -137,7 +137,6 @@ func (c Client) SearchMyIssues(limit int) ([]Issue, error) {
 
 // GetIssue fetches a single issue by key.
 func (c Client) GetIssue(key string) (*Issue, error) {
-	key = strings.TrimSpace(key)
 	if key == "" {
 		return nil, errors.New("jira: empty issue key")
 	}
@@ -156,7 +155,7 @@ func (c Client) GetIssue(key string) (*Issue, error) {
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
-		return nil, fmt.Errorf("jira: get issue %s failed: %s: %s", key, resp.Status, strings.TrimSpace(string(body)))
+		return nil, fmt.Errorf("jira: get issue %s failed: %s: %s", key, resp.Status, string(body))
 	}
 
 	var payload struct {
@@ -211,10 +210,10 @@ func (c Client) newRequest(method, p string, query url.Values) (*http.Request, e
 	}
 	req.Header.Set("Accept", "application/json")
 	// Jira Cloud uses basic auth with email:token
-	if strings.TrimSpace(c.email) == "" {
+	if c.email == "" {
 		return nil, errors.New("jira: missing email in client")
 	}
-	if strings.TrimSpace(c.token) == "" {
+	if c.token == "" {
 		return nil, errors.New("jira: missing token in client")
 	}
 	auth := base64.StdEncoding.EncodeToString([]byte(c.email + ":" + c.token))
