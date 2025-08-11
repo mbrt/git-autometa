@@ -141,7 +141,6 @@ Common keys (non-exhaustive):
 - `jira.server_url`, `jira.email`
 - `git.branch_pattern` (default `feature/{jira_id}-{jira_title}`), `git.max_branch_length`
 - `pull_request.title_pattern`, `pull_request.draft`, `pull_request.base_branch`, `pull_request.template`
-- `log_level`
 
 ### Security Considerations
 - JIRA API token is stored via `keyring` (service: `git-autometa-jira`, key: user email). No tokens in config files.

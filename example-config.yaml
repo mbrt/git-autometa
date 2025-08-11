@@ -48,5 +48,3 @@ pull_request:
 
     * [{jira_id}]({jira_url})
 
-# Logging level (DEBUG, INFO, WARNING, ERROR)
-log_level: "INFO"

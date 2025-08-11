@@ -206,8 +206,6 @@ pull_request:
   draft: true
   base_branch: "main"
   template_path: "templates/pr_template.md"
-
-log_level: "INFO"
 ```
 
 ### Repository-Specific Configuration Example

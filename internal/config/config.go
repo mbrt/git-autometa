@@ -5,7 +5,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 
+	"github.com/adrg/xdg"
 	"gopkg.in/yaml.v3"
 )
 
@@ -15,7 +17,6 @@ type Config struct {
 	GitHub      GitHubConfig      `yaml:"github"`
 	Git         GitConfig         `yaml:"git"`
 	PullRequest PullRequestConfig `yaml:"pull_request"`
-	LogLevel    string            `yaml:"log_level"`
 }
 
 type JiraConfig struct {
@@ -59,9 +60,21 @@ func DefaultConfig() *Config {
 			TitlePattern: "{jira_id}: {jira_title}",
 			Draft:        true,
 			BaseBranch:   "main",
-			Template:     "# What this Pull Request does/why we need it\n\n{jira_description}\n\n{commit_messages}\n\n## What type of PR is this?\n\nfeature\n\n## Relevant links\n\n* [{jira_id}]({jira_url})\n",
+			Template: `# What this Pull Request does/why we need it
+
+{jira_description}
+
+{commit_messages}
+
+## What type of PR is this?
+
+feature
+
+## Relevant links
+
+* [{jira_id}]({jira_url})
+`,
 		},
-		LogLevel: "INFO",
 	}
 }
 
@@ -105,66 +118,59 @@ func LoadEffectiveConfig(customPath string) (*Config, error) {
 	return cfg, nil
 }
 
-// GlobalConfigPath returns ~/.config/git-autometa/config.yaml
+// GlobalConfigPath returns the global config path using XDG base directories.
 func GlobalConfigPath() string {
-	home, err := os.UserHomeDir()
+	// Use XDG config directory, defaulting per the library behavior.
+	// Example on Linux: ~/.config/git-autometa/config.yaml
+	path, err := xdg.ConfigFile(filepath.Join("git-autometa", "config.yaml"))
 	if err != nil {
-		// Fall back to current directory
+		// Fall back to a relative file if XDG resolution fails
 		return "config.yaml"
 	}
-	return filepath.Join(home, ".config", "git-autometa", "config.yaml")
+	return path
 }
 
-// RepoConfigPath returns ~/.config/git-autometa/repositories/{owner}_{repo}.yaml
+// RepoConfigPath returns the repo-specific config path using XDG base directories.
 func RepoConfigPath(owner, repo string) string {
-	home, err := os.UserHomeDir()
+	rel := filepath.Join("git-autometa", "repositories", owner+"_"+repo+".yaml")
+	path, err := xdg.ConfigFile(rel)
 	if err != nil {
 		return filepath.Join("repositories", owner+"_"+repo+".yaml")
 	}
-	return filepath.Join(home, ".config", "git-autometa", "repositories", owner+"_"+repo+".yaml")
+	return path
 }
 
 // mergeInto merges non-zero values from src into dst.
 // This is a minimal shallow merge suitable for scaffolding.
 func mergeInto(dst, src *Config) {
-	// Jira
-	if src.Jira.ServerURL != "" {
-		dst.Jira.ServerURL = src.Jira.ServerURL
+	if dst == nil || src == nil {
+		return
 	}
-	if src.Jira.Email != "" {
-		dst.Jira.Email = src.Jira.Email
-	}
+	mergeStruct(reflect.ValueOf(dst).Elem(), reflect.ValueOf(src).Elem())
+}
 
-	// GitHub
-	if src.GitHub.Owner != "" {
-		dst.GitHub.Owner = src.GitHub.Owner
+// mergeStruct copies non-zero fields from src into dst. It recurses into nested structs.
+// For booleans, only true overrides (keeps previous behavior of only setting when true).
+func mergeStruct(dst, src reflect.Value) {
+	if dst.Kind() != reflect.Struct || src.Kind() != reflect.Struct {
+		return
 	}
-	if src.GitHub.Repo != "" {
-		dst.GitHub.Repo = src.GitHub.Repo
-	}
+	for i := 0; i < dst.NumField(); i++ {
+		dstField := dst.Field(i)
+		srcField := src.Field(i)
 
-	// Git
-	if src.Git.BranchPattern != "" {
-		dst.Git.BranchPattern = src.Git.BranchPattern
-	}
-	if src.Git.MaxBranchLength != 0 {
-		dst.Git.MaxBranchLength = src.Git.MaxBranchLength
-	}
+		if !dstField.CanSet() {
+			continue
+		}
 
-	// PR
-	if src.PullRequest.TitlePattern != "" {
-		dst.PullRequest.TitlePattern = src.PullRequest.TitlePattern
-	}
-	dst.PullRequest.Draft = src.PullRequest.Draft || dst.PullRequest.Draft
-	if src.PullRequest.BaseBranch != "" {
-		dst.PullRequest.BaseBranch = src.PullRequest.BaseBranch
-	}
-	if src.PullRequest.Template != "" {
-		dst.PullRequest.Template = src.PullRequest.Template
-	}
-
-	// Log level
-	if src.LogLevel != "" {
-		dst.LogLevel = src.LogLevel
+		switch dstField.Kind() {
+		case reflect.Struct:
+			mergeStruct(dstField, srcField)
+		default:
+			// Only overwrite when the source field is non-zero
+			if !srcField.IsZero() {
+				dstField.Set(srcField)
+			}
+		}
 	}
 }

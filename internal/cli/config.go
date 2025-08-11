@@ -17,12 +17,11 @@ var configGlobalCmd = &cobra.Command{
 	Use:   "global",
 	Short: "Edit or show global configuration",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := appconfig.LoadEffectiveConfig(cfgPath)
+		_, err := appconfig.LoadEffectiveConfig(cfgPath)
 		if err != nil {
 			return err
 		}
 		fmt.Println("Global config handling is not implemented yet.")
-		_ = cfg
 		return nil
 	},
 }
@@ -40,12 +39,12 @@ var configShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Show the effective configuration",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := appconfig.LoadEffectiveConfig(cfgPath)
+		_, err := appconfig.LoadEffectiveConfig(cfgPath)
 		if err != nil {
 			return err
 		}
 		// Print a minimal summary to confirm wiring
-		fmt.Printf("Config loaded. Log level: %s\n", cfg.LogLevel)
+		fmt.Println("Config loaded.")
 		return nil
 	},
 }
