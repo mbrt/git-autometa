@@ -7,7 +7,7 @@ import (
 // Client is a placeholder for a future GitHub client delegating to gh CLI.
 type Client struct{}
 
-func NewClient(cfg *appconfig.Config) *Client {
+func NewClient(cfg appconfig.Config) *Client {
 	_ = cfg
 	return &Client{}
 }

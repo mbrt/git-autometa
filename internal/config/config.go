@@ -42,8 +42,8 @@ type PullRequestConfig struct {
 }
 
 // DefaultConfig returns sensible defaults aligned with example-config.yaml.
-func DefaultConfig() *Config {
-	return &Config{
+func DefaultConfig() Config {
+	return Config{
 		Jira: JiraConfig{
 			ServerURL: "https://your-company.atlassian.net",
 			Email:     "",
@@ -81,7 +81,7 @@ feature
 // LoadEffectiveConfig loads the configuration using the priority:
 // custom path -> global path -> defaults. Repo-specific and overrides are
 // intended but not implemented yet in this scaffolding.
-func LoadEffectiveConfig(customPath string) (*Config, error) {
+func LoadEffectiveConfig(customPath string) (Config, error) {
 	cfg := DefaultConfig()
 
 	// Helper to load YAML into cfg
@@ -95,14 +95,14 @@ func LoadEffectiveConfig(customPath string) (*Config, error) {
 		if err := yaml.Unmarshal(data, &fileCfg); err != nil {
 			return err
 		}
-		mergeInto(cfg, &fileCfg)
+		mergeInto(&cfg, &fileCfg)
 		return nil
 	}
 
 	if customPath != "" {
 		if err := load(customPath); err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
-				return nil, err
+				return Config{}, err
 			}
 		}
 		return cfg, nil
@@ -111,7 +111,7 @@ func LoadEffectiveConfig(customPath string) (*Config, error) {
 	globalPath := GlobalConfigPath()
 	if err := load(globalPath); err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
-			return nil, err
+			return Config{}, err
 		}
 	}
 

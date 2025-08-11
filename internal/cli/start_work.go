@@ -26,7 +26,10 @@ var startWorkCmd = &cobra.Command{
 
 		_ = cfg // placeholder to avoid unused for now
 
-		jiraClient := jira.NewClient(cfg)
+		jiraClient, err := jira.NewClientWithKeyring(cfg)
+		if err != nil {
+			return err
+		}
 		git := gitutils.NewUtils()
 
 		// Placeholder flow mirroring architecture (no real behavior yet)

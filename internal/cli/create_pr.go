@@ -26,7 +26,10 @@ var createPrCmd = &cobra.Command{
 
 		_ = cfg // placeholder
 
-		jiraClient := jira.NewClient(cfg)
+		jiraClient, err := jira.NewClientWithKeyring(cfg)
+		if err != nil {
+			return err
+		}
 		ghClient := github.NewClient(cfg)
 
 		_ = jiraClient
