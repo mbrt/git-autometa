@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	appconfig "git-autometa/internal/config"
-	"git-autometa/internal/gitutils"
+	"git-autometa/internal/git"
 	"git-autometa/internal/jira"
 )
 
@@ -24,13 +24,11 @@ var startWorkCmd = &cobra.Command{
 			return err
 		}
 
-		_ = cfg // placeholder to avoid unused for now
-
 		jiraClient, err := jira.NewClientWithKeyring(cfg)
 		if err != nil {
 			return err
 		}
-		git := gitutils.NewUtils()
+		git := git.New()
 
 		// Placeholder flow mirroring architecture (no real behavior yet)
 		var issueKey string
