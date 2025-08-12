@@ -39,7 +39,7 @@ This document explains how git-autometa is structured, how the main workflows op
   - Supports saving global, repo, or a custom config path.
 
 - `git_autometa.jira_client.JiraClient`
-  - Auth: uses `keyring` to retrieve an API token stored under service `git-autometa-jira` with the user email as key.
+  - Auth: retrieves the API token via the centralized `internal/secrets` package. Tokens are stored in the system keyring under service `git-autometa` with keys like `jira:<email>`.
   - `test_connection()`: GET `/rest/api/2/myself` to verify credentials and connectivity.
   - `search_my_issues(limit=15)`: Uses JQL to fetch issues assigned to current user, excluding Done category, ordered by last updated.
     - JQL: `assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC`
@@ -143,7 +143,7 @@ Common keys (non-exhaustive):
 - `pull_request.title_pattern`, `pull_request.draft`, `pull_request.base_branch`, `pull_request.template`
 
 ### Security Considerations
-- JIRA API token is stored via `keyring` (service: `git-autometa-jira`, key: user email). No tokens in config files.
+- JIRA API token is stored via `keyring` using a consolidated service `git-autometa` (key format: `jira:<email>`). No tokens are stored in configuration files.
 - GitHub authentication is delegated to the `gh` CLI; this tool does not handle GitHub tokens directly.
 
 ### Error Handling and Logging

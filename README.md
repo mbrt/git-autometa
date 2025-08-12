@@ -11,7 +11,7 @@ A Python tool for automating JIRA-based git workflows. Automatically create bran
 - 🎯 **Create git branches** from JIRA issues with configurable naming patterns
 - 🔄 **Generate pull requests** with JIRA metadata and custom templates
 - 🔀 **Multiple branch support** - handles local/remote conflicts intelligently
-- 🔐 **Secure credential management** using keyring for JIRA API tokens
+- 🔐 **Secure credential management** using keyring for JIRA API tokens (consolidated under a single `git-autometa` keyring service)
 - 🎨 **Rich CLI interface** with colored output and progress indicators
 - ⚙️ **Highly configurable** with YAML configuration files
 - 🐙 **GitHub CLI integration** for seamless PR creation
@@ -41,7 +41,7 @@ pipx install .
    This will prompt you for:
    - JIRA server URL
    - JIRA email
-   - JIRA API token (stored securely in keyring)
+   - JIRA API token (stored securely in keyring via a consolidated `git-autometa` service)
 
 2. **Create a branch for a JIRA issue:**
    ```bash
@@ -274,7 +274,7 @@ Available template placeholders:
 
 ## Security
 
-- **JIRA API tokens** are stored securely using the system keyring
+- **JIRA API tokens** are stored securely using the system keyring through the consolidated `git-autometa` service (keys like `jira:<email>`).
 - **GitHub authentication** uses the GitHub CLI's existing auth
 - **No secrets** are stored in configuration files
 

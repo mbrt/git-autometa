@@ -12,14 +12,11 @@ import (
 	"strings"
 	"time"
 
-	keyring "github.com/zalando/go-keyring"
-
 	appconfig "git-autometa/internal/config"
+	"git-autometa/internal/secrets"
 )
 
-const (
-	jiraServiceName = "git-autometa-jira"
-)
+// Note: secrets are retrieved via the centralized secrets package.
 
 // Client provides minimal Jira REST API access required by the CLI.
 type Client struct {
@@ -45,12 +42,9 @@ func NewClientWithKeyring(cfg appconfig.Config) (Client, error) {
 	if cfg.Jira.Email == "" {
 		return Client{}, errors.New("jira: missing email in config")
 	}
-	token, err := keyring.Get(jiraServiceName, cfg.Jira.Email)
+	token, err := secrets.GetJiraToken(cfg.Jira.Email)
 	if err != nil {
 		return Client{}, fmt.Errorf("jira: unable to load API token from keyring for %s: %w", cfg.Jira.Email, err)
-	}
-	if token == "" {
-		return Client{}, errors.New("jira: empty API token retrieved from keyring")
 	}
 	return NewClient(cfg, token), nil
 }

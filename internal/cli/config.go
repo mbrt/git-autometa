@@ -11,14 +11,14 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	keyring "github.com/zalando/go-keyring"
 	"gopkg.in/yaml.v3"
 
 	appconfig "git-autometa/internal/config"
 	"git-autometa/internal/git"
+	"git-autometa/internal/secrets"
 )
 
-const jiraKeyringService = "git-autometa-jira"
+// Note: secrets are stored via the centralized secrets package.
 
 var (
 	configGlobalShow bool
@@ -182,7 +182,7 @@ func runConfigEditGlobal(in io.Reader, out io.Writer) error {
 
 	// Store token (optional)
 	if tokenInput != "" && emailInput != "" {
-		if err := keyring.Set(jiraKeyringService, emailInput, tokenInput); err != nil {
+		if err := secrets.SetJiraToken(emailInput, tokenInput); err != nil {
 			return fmt.Errorf("failed saving token to keyring: %w", err)
 		}
 	}
