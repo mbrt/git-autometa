@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -10,32 +11,32 @@ import (
 
 // Config mirrors the keys from example-config.yaml and the Python architecture.
 type Config struct {
-	Jira        JiraConfig        `yaml:"jira"`
-	GitHub      GitHubConfig      `yaml:"github"`
-	Git         GitConfig         `yaml:"git"`
-	PullRequest PullRequestConfig `yaml:"pull_request"`
+	Jira        JiraConfig        `yaml:"jira,omitempty"`
+	GitHub      GitHubConfig      `yaml:"github,omitempty"`
+	Git         GitConfig         `yaml:"git,omitempty"`
+	PullRequest PullRequestConfig `yaml:"pull_request,omitempty"`
 }
 
 type JiraConfig struct {
-	ServerURL string `yaml:"server_url"`
-	Email     string `yaml:"email"`
+	ServerURL string `yaml:"server_url,omitempty"`
+	Email     string `yaml:"email,omitempty"`
 }
 
 type GitHubConfig struct {
-	Owner string `yaml:"owner"`
-	Repo  string `yaml:"repo"`
+	Owner string `yaml:"owner,omitempty"`
+	Repo  string `yaml:"repo,omitempty"`
 }
 
 type GitConfig struct {
-	BranchPattern   string `yaml:"branch_pattern"`
-	MaxBranchLength int    `yaml:"max_branch_length"`
+	BranchPattern   string `yaml:"branch_pattern,omitempty"`
+	MaxBranchLength int    `yaml:"max_branch_length,omitempty"`
 }
 
 type PullRequestConfig struct {
-	TitlePattern string `yaml:"title_pattern"`
-	Draft        bool   `yaml:"draft"`
-	BaseBranch   string `yaml:"base_branch"`
-	Template     string `yaml:"template"`
+	TitlePattern string `yaml:"title_pattern,omitempty"`
+	Draft        bool   `yaml:"draft,omitempty"`
+	BaseBranch   string `yaml:"base_branch,omitempty"`
+	Template     string `yaml:"template,omitempty"`
 }
 
 // DefaultConfig returns sensible defaults aligned with example-config.yaml.
@@ -77,6 +78,12 @@ feature
 
 // LoadConfigForRepo loads the configuration for a given repository.
 // It merges the global config with the repo-specific config.
+func LoadGlobalConfig() (Config, error) {
+	return LoadEffectiveConfig(GlobalConfigPath())
+}
+
+// LoadConfigForRepo loads the configuration for a given repository.
+// It merges the global config with the repo-specific config.
 func LoadConfigForRepo(owner, repo string) (Config, error) {
 	return LoadEffectiveConfig(
 		GlobalConfigPath(),
@@ -86,11 +93,16 @@ func LoadConfigForRepo(owner, repo string) (Config, error) {
 
 // LoadEffectiveConfig loads the configuration using priority order.
 // The last path takes precedence over the previous ones.
+//
+// Non existing files are ignored.
 func LoadEffectiveConfig(paths ...string) (Config, error) {
 	cfg := DefaultConfig()
 	for _, path := range paths {
 		data, err := os.ReadFile(path)
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
 			return cfg, err
 		}
 		// Unmarshal directly into cfg.
@@ -121,4 +133,21 @@ func RepoConfigPath(owner, repo string) string {
 		return filepath.Join("repositories", owner+"_"+repo+".yaml")
 	}
 	return path
+}
+
+// SaveRepoConfig persists repository-specific overrides to the standard repo config path.
+// It returns the written file path on success.
+func SaveRepoConfig(owner, repo string, overrides Config) (string, error) {
+	path := RepoConfigPath(owner, repo)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return "", err
+	}
+	data, err := yaml.Marshal(overrides)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return "", err
+	}
+	return path, nil
 }

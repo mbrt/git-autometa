@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	cfgPath string
-	verbose bool
+	verbose   bool
+	repoOwner string
+	repoName  string
 )
 
 var rootCmd = &cobra.Command{
@@ -27,6 +28,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgPath, "config", "", "Path to a custom config file (YAML)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
+	rootCmd.PersistentFlags().StringVar(&repoOwner, "owner", "", "Repository owner (defaults to current git remote)")
+	rootCmd.PersistentFlags().StringVar(&repoName, "repo", "", "Repository name (defaults to current git remote)")
 }

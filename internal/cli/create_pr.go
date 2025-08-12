@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	appconfig "git-autometa/internal/config"
 	"git-autometa/internal/github"
 	"git-autometa/internal/jira"
 )
@@ -35,7 +34,7 @@ func init() {
 }
 
 func runCreatePR(cmd *cobra.Command, args []string) error {
-	cfg, err := appconfig.LoadEffectiveConfig(cfgPath)
+	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}

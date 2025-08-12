@@ -23,8 +23,6 @@ const jiraKeyringService = "git-autometa-jira"
 var (
 	configGlobalShow bool
 	configRepoShow   bool
-	repoOwner        string
-	repoName         string
 )
 
 var configCmd = &cobra.Command{
@@ -70,18 +68,21 @@ func init() {
 	// repo
 	configCmd.AddCommand(configRepoCmd)
 	configRepoCmd.Flags().BoolVar(&configRepoShow, "show", false, "Show current repository configuration")
-	configRepoCmd.Flags().StringVar(&repoOwner, "owner", "", "Repository owner (defaults to current git remote)")
-	configRepoCmd.Flags().StringVar(&repoName, "repo", "", "Repository name (defaults to current git remote)")
 	// show
 	configCmd.AddCommand(configShowCmd)
 }
 
-func runConfigShowGlobal(out io.Writer) error {
-	// Determine path precedence: explicit --config, otherwise global path
-	path := cfgPath
-	if strings.TrimSpace(path) == "" {
-		path = appconfig.GlobalConfigPath()
+func loadConfig() (appconfig.Config, error) {
+	paths := []string{appconfig.GlobalConfigPath()}
+	owner, repo := resolveOwnerRepo()
+	if owner != "" && repo != "" {
+		paths = append(paths, appconfig.RepoConfigPath(owner, repo))
 	}
+	return appconfig.LoadEffectiveConfig(paths...)
+}
+
+func runConfigShowGlobal(out io.Writer) error {
+	path := appconfig.GlobalConfigPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -101,13 +102,14 @@ func runConfigShowGlobal(out io.Writer) error {
 func runConfigShowRepo(out io.Writer) error {
 	owner, repo := resolveOwnerRepo()
 	if owner == "" || repo == "" {
-		fmt.Fprintln(out, "Repository owner/repo not detected. Use --owner and --repo flags or set in config.")
-		return nil
+		return errors.New("repository owner/repo not detected")
 	}
 	path := appconfig.RepoConfigPath(owner, repo)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(out, "Repo config not found at %s\nShowing global config instead\n", path)
+			runConfigShowGlobal(out)
 			return nil
 		}
 		return err
@@ -122,7 +124,7 @@ func runConfigShowRepo(out io.Writer) error {
 
 func runConfigShowEffective(out io.Writer) error {
 	// Start from defaults merged with global
-	paths := []string{cfgPath}
+	paths := []string{appconfig.GlobalConfigPath()}
 	// Merge repo-specific overrides if available
 	owner, repo := resolveOwnerRepo()
 	if owner != "" && repo != "" {
@@ -143,7 +145,7 @@ func runConfigShowEffective(out io.Writer) error {
 
 func runConfigEditGlobal(in io.Reader, out io.Writer) error {
 	// Load current effective to use as defaults in the wizard
-	cfg, err := appconfig.LoadEffectiveConfig(cfgPath)
+	cfg, err := appconfig.LoadGlobalConfig()
 	if err != nil {
 		return err
 	}
@@ -193,31 +195,17 @@ func runConfigEditGlobal(in io.Reader, out io.Writer) error {
 
 func runConfigEditRepo(in io.Reader, out io.Writer) error {
 	owner, repo := resolveOwnerRepo()
-	reader := bufio.NewReader(in)
-	if owner == "" {
-		fmt.Fprint(out, "Repository owner (e.g., my-user): ")
-		if s := readString(reader); s != "" {
-			owner = s
-		}
-	}
-	if repo == "" {
-		fmt.Fprint(out, "Repository name (e.g., my-repo): ")
-		if s := readString(reader); s != "" {
-			repo = s
-		}
-	}
 	if owner == "" || repo == "" {
-		return errors.New("owner/repo not provided")
+		return errors.New("repository owner/repo not detected")
 	}
+	reader := bufio.NewReader(in)
 
 	// Load current effective config as defaults for prompts
-	baseCfg, err := appconfig.LoadEffectiveConfig(cfgPath)
+	baseCfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
-	// Start with empty overrides and fill only provided fields
 	overrides := appconfig.Config{}
-
 	fmt.Fprintf(out, "Branch pattern [%s]: ", baseCfg.Git.BranchPattern)
 	if s := readString(reader); s != "" {
 		overrides.Git.BranchPattern = s
@@ -245,19 +233,12 @@ func runConfigEditRepo(in io.Reader, out io.Writer) error {
 		}
 	}
 
-	// Persist repo-specific config
-	path := appconfig.RepoConfigPath(owner, repo)
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	data, err := yaml.Marshal(overrides)
+	// Persist repo-specific config using dedicated config package function
+	path, err := appconfig.SaveRepoConfig(owner, repo, overrides)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Saved repository configuration for %s/%s to %s\n", owner, repo, path)
+	fmt.Fprintf(out, "Saved repository configuration for %s/%s to %q\n", owner, repo, path)
 	return nil
 }
 
@@ -315,14 +296,6 @@ func readString(r *bufio.Reader) string {
 	v, _ := r.ReadString('\n')
 	return strings.TrimSpace(v)
 }
-
-// func readString2(dst *string, out io.Writer, r *bufio.Reader, prompt string) {
-// 	fmt.Fprintf(out, "%s [%s]: ", prompt, *dst)
-// 	v, _ := r.ReadString('\n')
-// 	if v = strings.TrimSpace(v); v != "" {
-// 		*dst = v
-// 	}
-// }
 
 // readInt reads a line and parses a trimmed integer. Returns (value, true) on success.
 func readInt(r *bufio.Reader) (int, bool) {

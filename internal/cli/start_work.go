@@ -126,7 +126,7 @@ func formatBranchName(cfg appconfig.Config, issue jira.Issue) string {
 }
 
 func runStartWork(args []string) error {
-	cfg, err := appconfig.LoadEffectiveConfig(cfgPath)
+	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
