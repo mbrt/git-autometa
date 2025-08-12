@@ -1,105 +1,98 @@
-## git-autometa Architecture
+## git-autometa Architecture (Go)
 
-This document explains how git-autometa is structured, how the main workflows operate end-to-end, and how the modules interact. It is intended for contributors and maintainers.
+This document describes the Go implementation: structure, workflows, and module interactions for contributors and maintainers.
 
 ### Goals
-- Automate common Git workflows around JIRA issues: branch creation and PR creation.
-- Provide a friendly CLI with safe defaults, prompts, and rich output.
-- Keep configuration centralized (global + per-repo) with clear override rules.
-- Integrate with JIRA via REST API and GitHub via the `gh` CLI.
+- Automate Git workflows around JIRA issues: branch creation and PR creation.
+- Provide a simple CLI with safe defaults and minimal prompts.
+- Centralize configuration (global + per-repo) with clear override rules.
+- Integrate with JIRA via REST and GitHub via the `gh` CLI.
 
 ### High-Level Overview
-- CLI entrypoint: `git_autometa.main:cli` (registered in `pyproject.toml`).
-- Configuration: `git_autometa.config.Config` resolves effective settings from global and repo-specific files, with a custom-config override.
-- JIRA client: `git_autometa.jira_client.JiraClient` handles API calls and maps responses to `JiraIssue` objects.
-- Markdown conversion: `git_autometa.jira_markdown_converter` converts JIRA markup to GitHub-friendly Markdown for PR descriptions.
-- Git utilities: `git_autometa.git_utils.GitUtils` wraps Git operations via GitPython and some subprocess commands.
-- GitHub client: `git_autometa.github_client.GitHubClient` delegates to the `gh` CLI for PR operations.
+- Entry point: `main.go` calls `internal/cli.Execute()`.
+- CLI: Cobra commands in `internal/cli/` (`root.go`, `start_work.go`, `create_pr.go`, `config.go`, `status.go`).
+- Configuration: `internal/config` types and helpers. Loads defaults, global file, and optional repo overrides under XDG config dir.
+- JIRA client: `internal/jira` provides a small REST client and `Issue` model.
+- Markdown conversion: `internal/markdown` converts Jira wiki markup to GitHub Markdown.
+- Git utilities: `internal/git` wraps `git` CLI for branch, commit, and remote operations.
+- GitHub client: `internal/github` wraps the `gh` CLI for PR operations.
+- Secrets: `internal/secrets` stores Jira tokens in the OS keyring under a single service.
 
 ### Module Responsibilities and Contracts
 
-- `git_autometa.main`
-  - Defines the CLI via `click` with commands:
-    - `start-work [JIRA-KEY] [--push]`
-    - `create-pr [--base-branch <name>] [--no-draft]`
-    - `config` group: `global`, `repo`, `show`
-    - `status`
-  - Initializes logging via `rich` and loads `Config`.
-  - Orchestrates interactions among `JiraClient`, `GitUtils`, and `GitHubClient`.
-  - Provides `select_jira_issue_interactively` to list and choose assigned issues (excludes Done issues at source).
-  - Provides `format_branch_name(pattern, issue, max_length)` to build branch names.
+- `internal/cli/root.go`
+  - Defines the root command `git-autometa` and persistent flags: `-v/--verbose`, `--owner`, `--repo`.
 
-- `git_autometa.config.Config`
-  - Centralized config directory: `~/.config/git-autometa/`.
-    - Global config: `config.yaml`.
-    - Repo config: `repositories/{owner}_{repo}.yaml`.
-  - Resolves values with priority: repo-specific → global → defaults.
-  - Detects current repo identity via `GitUtils.get_remote_url("origin")` and URL parsing.
-  - Offers helpers for common values (e.g., `jira_server_url`, `branch_pattern`, `pr_template`, etc.).
-  - Supports saving global, repo, or a custom config path.
+- `internal/cli/config.go`
+  - Commands: `config global`, `config repo`, `config show`.
+  - Global: prompts for Jira `server_url`, `email`, optionally stores token to keyring via `internal/secrets`.
+  - Repo: writes overrides to `~/.config/git-autometa/repositories/{owner}_{repo}.yaml`.
+  - `config show`: prints the merged, effective config as YAML.
 
-- `git_autometa.jira_client.JiraClient`
-  - Auth: retrieves the API token via the centralized `internal/secrets` package. Tokens are stored in the system keyring under service `git-autometa` with keys like `jira:<email>`.
-  - `test_connection()`: GET `/rest/api/2/myself` to verify credentials and connectivity.
-  - `search_my_issues(limit=15)`: Uses JQL to fetch issues assigned to current user, excluding Done category, ordered by last updated.
-    - JQL: `assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC`
-    - Returns a list of `JiraIssue`, each enriched with a computed `url`.
-  - `get_issue(issue_key)`: GET `/rest/api/2/issue/{key}` with validation and returns `JiraIssue`.
+- `internal/cli/start_work.go`
+  - Command: `start-work [JIRA-KEY] [--push]`.
+  - If no key is provided, lists up to 15 assigned issues via `jira.Client.SearchMyIssues` and prompts selection; falls back to manual entry on error or empty list.
+  - Formats branch names using `Config.Git.BranchPattern` and placeholders `{jira_id}`, `{jira_title}`, `{jira_type}`; sanitizes and truncates per `MaxBranchLength`.
+  - Calls `git.Utils.PrepareWorkBranch`, which fetches, determines `main` or `master`, and creates the branch; auto-increments name if it exists locally or remotely. Optionally pushes with `--push`.
 
-- `git_autometa.jira_client.JiraIssue`
-  - Thin wrapper over the JIRA issue JSON with properties: `key`, `summary`, `description`, `issue_type`, `status`, `assignee`, `url`.
-  - `description_markdown` converts JIRA markup using `convert_jira_to_markdown`.
-  - `slugify_title(max_length)` builds a safe branch slug from the issue summary.
+- `internal/cli/create_pr.go`
+  - Command: `create-pr [--base-branch <name>] [--no-draft]`.
+  - Extracts the first `ABC-123` token from the current branch. Fetches the issue to populate title/body.
+  - Title from `PullRequest.TitlePattern`. Body from `PullRequest.Template` with placeholders:
+    - `{jira_id}`, `{jira_title}`, `{jira_type}`, `{jira_url}`, `{jira_description}`
+    - `{commit_messages}`: bullets from `git.Utils.GetCommitMessagesForPR(base)` with common Jira tags removed.
+  - Creates the PR via `github.Client.CreatePullRequest` (`gh pr create --json url`).
 
-- `git_autometa.jira_markdown_converter`
-  - Regex-driven conversion from JIRA markup (headers, lists, code/quote blocks, tables, inline styles) to GitHub Markdown.
-  - Exposed via `convert_jira_to_markdown(jira_text)`.
+- `internal/config`
+  - Types: `Config`, `JiraConfig`, `GitHubConfig`, `GitConfig`, `PullRequestConfig`.
+  - Defaults via `DefaultConfig()`; load/merge with `LoadEffectiveConfig(paths...)` where last wins.
+  - Paths via XDG: `GlobalConfigPath()` and `RepoConfigPath(owner, repo)`.
+  - `SaveRepoConfig` writes per-repo overrides.
 
-- `git_autometa.git_utils.GitUtils`
-  - Repository discovery via GitPython (searching parent directories).
-  - Branch operations: create, checkout, push, determine main branch, fetch/pull.
-  - Safety and UX:
-    - `prepare_work_branch(base_branch_name)`: fetches, ensures latest main, then creates branch or resolves conflicts via interactive prompt:
-      - If branch exists locally/remotely, prompt: switch to existing vs. create alternative name (auto-increment suffix).
-    - Provides helpers for status, uncommitted changes, stashing, and PR commit message extraction.
-  - PR commit messages: uses `git log` to build a bulleted list, removing leading JIRA tags like `[ABC-123]`.
+- `internal/jira`
+  - `Client` with `NewClientWithKeyring(Config)` reads token from keyring (`internal/secrets`).
+  - `SearchMyIssues(limit)` and `GetIssue(key)`; builds issue URLs; converts descriptions to Markdown via `internal/markdown`.
 
-- `git_autometa.github_client.GitHubClient`
-  - Requires `gh` CLI installed and authenticated (`gh auth status`).
-  - Repository context via `gh repo view`.
-  - Creates PRs via `gh pr create` (supports draft flag and base branch override).
-  - Provides basic helpers to test connection and list PRs.
+- `internal/git`
+  - Branch preparation, push, current branch detection, commit message listing, and remote URL retrieval.
+  - Auto-increment branch names when conflicts are detected locally or on `origin`.
+
+- `internal/github`
+  - Wraps `gh auth status`, `gh pr create`, and `gh pr list`. Supports `--repo <owner>/<repo>` when configured.
+
+- `internal/markdown`
+  - Jira wiki → GitHub Markdown: headings, lists, inline styles, links, code/quote blocks, and basic tables.
+
+- `internal/secrets`
+  - OS keyring wrapper using a single service `git-autometa` with keys `jira:<email>`.
 
 ### Key Flows
 
-#### A) Start Work (with interactive selection)
+#### A) Start Work (interactive)
 
 ```mermaid
 sequenceDiagram
   autonumber
   participant User
-  participant CLI as main.py (CLI)
-  participant Config as Config
+  participant CLI as start-work (CLI)
+  participant Config
   participant JIRA as JiraClient
   participant Git as GitUtils
 
   User->>CLI: git-autometa start-work
   CLI->>Config: Load effective configuration
-  CLI->>JIRA: search_my_issues(limit=15)
-  JIRA->>JIRA: GET /rest/api/2/search (JQL excludes Done)
-  JIRA-->>CLI: List[JiraIssue]
-  CLI->>User: Render numbered list, prompt for selection
-  User-->>CLI: Select issue key
-  CLI->>JIRA: get_issue(issueKey)
-  JIRA-->>CLI: JiraIssue (summary, type, description)
-  CLI->>CLI: format_branch_name(pattern, issue)
-  CLI->>Git: prepare_work_branch(base_branch_name)
-  Git->>Git: fetch, ensure latest main, create/checkout or resolve conflicts
-  Git-->>CLI: final_branch_name
+  CLI->>JIRA: SearchMyIssues(limit=15)
+  JIRA-->>CLI: List[Issue]
+  CLI->>User: Print list and prompt
+  User-->>CLI: Select entry or enter key
+  CLI->>JIRA: GetIssue(key)
+  CLI->>CLI: FormatBranchName(cfg, issue)
+  CLI->>Git: PrepareWorkBranch(name)
+  Git-->>CLI: final name (auto-increment if needed)
   alt --push flag
-    CLI->>Git: push_branch(final_branch_name)
+    CLI->>Git: PushBranch(name)
   end
-  CLI-->>User: Branch ready
+  CLI-->>User: Ready on branch
 ```
 
 #### B) Create Pull Request
@@ -108,89 +101,51 @@ sequenceDiagram
 sequenceDiagram
   autonumber
   participant User
-  participant CLI as main.py (CLI)
-  participant Config as Config
+  participant CLI as create-pr (CLI)
+  participant Config
   participant JIRA as JiraClient
   participant GH as GitHubClient
   participant Git as GitUtils
 
   User->>CLI: git-autometa create-pr [--base-branch] [--no-draft]
   CLI->>Config: Load effective configuration
-  CLI->>Git: get_current_branch()
-  CLI->>CLI: Extract issue key from branch name
-  CLI->>JIRA: get_issue(issueKey)
-  JIRA-->>CLI: JiraIssue (summary, description_markdown, url)
-  CLI->>Config: pr_title_pattern / pr_template / base branch
-  CLI->>Git: get_commit_messages_for_pr(base)
-  CLI->>GH: create_pull_request(title, body, head, base, draft)
+  CLI->>Git: GetCurrentBranch()
+  CLI->>CLI: ExtractIssueKeyFromBranch()
+  CLI->>JIRA: GetIssue(key)
+  CLI->>Git: GetCommitMessagesForPR(base)
+  CLI->>CLI: FormatPRTitle/Body(cfg, issue, commits)
+  CLI->>GH: CreatePullRequest(title, body, head, base, draft)
   GH-->>CLI: PR URL
-  CLI-->>User: PR created
+  CLI-->>User: Print PR URL
 ```
 
 ### Configuration Resolution and Storage
-- Default locations:
+- Locations:
   - Global: `~/.config/git-autometa/config.yaml`
   - Repo: `~/.config/git-autometa/repositories/{owner}_{repo}.yaml`
-- Priority when reading values:
-  1. Repo-specific config (if present)
-  2. Global config
-  3. Built-in defaults in `Config` properties
-- Custom config path (`--config`) bypasses centralized storage and reads/writes the provided file.
-
-Common keys (non-exhaustive):
-- `jira.server_url`, `jira.email`
-- `git.branch_pattern` (default `feature/{jira_id}-{jira_title}`), `git.max_branch_length`
-- `pull_request.title_pattern`, `pull_request.draft`, `pull_request.base_branch`, `pull_request.template`
+- Priority (last wins): repo-specific → global → defaults.
+- Keys (non-exhaustive):
+  - `jira.server_url`, `jira.email`
+  - `github.owner`, `github.repo`
+  - `git.branch_pattern`, `git.max_branch_length`
+  - `pull_request.title_pattern`, `pull_request.draft`, `pull_request.base_branch`, `pull_request.template`
 
 ### Security Considerations
-- JIRA API token is stored via `keyring` using a consolidated service `git-autometa` (key format: `jira:<email>`). No tokens are stored in configuration files.
-- GitHub authentication is delegated to the `gh` CLI; this tool does not handle GitHub tokens directly.
+- Jira API token is stored in the OS keyring under service `git-autometa` with keys like `jira:<email>`.
+- GitHub authentication is delegated to `gh`. No GitHub tokens are stored by this tool.
 
-### Error Handling and Logging
-- Logging configured via `rich.logging.RichHandler`; verbosity controlled by `-v` (DEBUG) or default INFO.
-- Fail-fast scenarios with clear console messages and non-zero exit on fatal errors (e.g., missing config, invalid repo, API errors).
-- Network/CLI errors are caught and surfaced with actionable hints (e.g., run `gh auth login`, configure JIRA).
-
-### Notable Implementation Details
-- Issue filtering: `search_my_issues` excludes issues in JIRA’s Done category using `statusCategory != Done`.
-- Interactive issue list is reversed before display so the most recent appears at the bottom of the list.
-- Branch conflict handling presents a simple two-option prompt and auto-increments the alternative name.
-- PR body combines converted JIRA description with a reverse-chronological bullet list of commit messages relative to base.
-
-### Extensibility
-- Additional providers:
-  - JIRA alternatives could be implemented behind a similar client abstraction and wired into `main.py`.
-  - Git hosting alternatives (e.g., GitLab) could be supported via a new client that mirrors the `GitHubClient` interface.
-- Configuration:
-  - New keys should be added as `Config` properties with sensible defaults.
-- CLI:
-  - New commands should follow the existing `click` patterns, reuse `Config`, and integrate with existing clients.
-
-### Dependencies and Runtime Environment
-- Python 3.8+
-- `GitPython`, `click`, `rich`, `requests`, `PyYAML`, `keyring`
-- `gh` CLI for GitHub operations (installed and authenticated)
-- A valid Git repo workspace when running git-related commands
-
-### File and Module Map
-- `src/git_autometa/main.py`: CLI, orchestration, formatting, prompts, commands.
-- `src/git_autometa/config.py`: Centralized config management and resolution.
-- `src/git_autometa/jira_client.py`: JIRA integration and issue model.
-- `src/git_autometa/jira_markdown_converter.py`: JIRA→Markdown conversion utilities.
-- `src/git_autometa/git_utils.py`: Git operations and branching workflow helpers.
-- `src/git_autometa/github_client.py`: GitHub integration via `gh`.
+### Error Handling
+- Commands print errors and exit with non-zero codes without dumping usage on runtime errors.
+- Network/CLI failures are surfaced with concise messages (e.g., run `gh auth login`, configure Jira).
 
 ### Testing and Local Development
-- Dev dependencies declared in `pyproject.toml` under `[tool.uv].dev-dependencies`.
-- Typical workflow:
-  - `uv sync --dev` to install dev deps
-  - `pytest` to run tests
-  - `black src/` and `flake8` for formatting/linting
+- Build and test with:
+  - `go build .`
+  - `go test ./...`
 
 ### Future Improvements
-- More robust extraction of JIRA key from branch names in `create-pr`.
-- Configurable JQL for issue searches (e.g., include custom statuses/boards).
-- Non-interactive flags for branch conflict handling.
-- Better error categorization and retry strategy for transient network issues.
+- Configurable JQL for issue searches.
+- Non-interactive flags for alternative branch naming policy.
+- Better heuristics for extracting the JIRA key from branch names.
 
 
