@@ -10,23 +10,23 @@ import (
 	"strings"
 )
 
-// Utils is a wrapper around Git operations executed in the current working directory.
-type Utils struct {
+// Git is a wrapper around Git operations executed in the current working directory.
+type Git struct {
 	// WorkDir is the filesystem path where git commands should run.
 	// If empty, commands run in the current process working directory.
 	WorkDir string
 }
 
-func New() *Utils { return &Utils{} }
+func New() *Git { return &Git{} }
 
-// NewUtilsWithWorkDir creates a Utils bound to the provided working directory.
-func NewUtilsWithWorkDir(dir string) *Utils { return &Utils{WorkDir: dir} }
+// NewWithWorkDir creates a Utils bound to the provided working directory.
+func NewWithWorkDir(dir string) *Git { return &Git{WorkDir: dir} }
 
 // PrepareWorkBranch ensures the repository is up to date on the default branch (main/master)
 // and creates/switches to a new work branch derived from the provided name.
 // If the desired branch already exists locally or remotely, it will automatically
 // append an incrementing numeric suffix (e.g., "-2", "-3", ...) until an unused name is found.
-func (g *Utils) PrepareWorkBranch(desiredBranchName string) (string, error) {
+func (g *Git) PrepareWorkBranch(desiredBranchName string) (string, error) {
 	if err := g.assertGitRepo(); err != nil {
 		return "", err
 	}
@@ -78,7 +78,7 @@ func (g *Utils) PrepareWorkBranch(desiredBranchName string) (string, error) {
 }
 
 // PushBranch pushes the given branch to origin and sets upstream if not set.
-func (g *Utils) PushBranch(branchName string) error {
+func (g *Git) PushBranch(branchName string) error {
 	if err := g.assertGitRepo(); err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func (g *Utils) PushBranch(branchName string) error {
 }
 
 // GetCurrentBranch returns the name of the current checked-out branch.
-func (g *Utils) GetCurrentBranch() (string, error) {
+func (g *Git) GetCurrentBranch() (string, error) {
 	if err := g.assertGitRepo(); err != nil {
 		return "", err
 	}
@@ -103,7 +103,7 @@ func (g *Utils) GetCurrentBranch() (string, error) {
 
 // GetCommitMessagesForPR returns commit subjects from baseBranch..HEAD, with leading
 // JIRA tags like "[ABC-123]" or "ABC-123:" stripped from each message.
-func (g *Utils) GetCommitMessagesForPR(baseBranch string) ([]string, error) {
+func (g *Git) GetCommitMessagesForPR(baseBranch string) ([]string, error) {
 	if err := g.assertGitRepo(); err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (g *Utils) GetCommitMessagesForPR(baseBranch string) ([]string, error) {
 }
 
 // GetRemoteURL returns the URL for the given remote.
-func (g *Utils) GetRemoteURL(remote string) (string, error) {
+func (g *Git) GetRemoteURL(remote string) (string, error) {
 	if err := g.assertGitRepo(); err != nil {
 		return "", err
 	}
@@ -145,7 +145,7 @@ func (g *Utils) GetRemoteURL(remote string) (string, error) {
 
 // --- helpers ---
 
-func (g *Utils) assertGitRepo() error {
+func (g *Git) assertGitRepo() error {
 	_, err := runGitDir(g.WorkDir, "rev-parse", "--git-dir")
 	return err
 }
