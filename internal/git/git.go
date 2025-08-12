@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -202,14 +203,9 @@ func incrementBranchName(name string) string {
 	prefix := name[:lastDash]
 	suffix := name[lastDash+1:]
 	// Try to parse numeric suffix
-	var n int
-	for i := 0; i < len(suffix); i++ {
-		if suffix[i] < '0' || suffix[i] > '9' {
-			return name + "-2"
-		}
-	}
-	if _, err := fmt.Sscanf(suffix, "%d", &n); err != nil || n <= 1 {
+	parsed, err := strconv.Atoi(suffix)
+	if err != nil || parsed <= 1 {
 		return name + "-2"
 	}
-	return fmt.Sprintf("%s-%d", prefix, n+1)
+	return fmt.Sprintf("%s-%d", prefix, parsed+1)
 }

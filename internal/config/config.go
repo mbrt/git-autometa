@@ -1,11 +1,8 @@
 package config
 
 import (
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 
 	"github.com/adrg/xdg"
 	"gopkg.in/yaml.v3"
@@ -78,43 +75,29 @@ feature
 	}
 }
 
-// LoadEffectiveConfig loads the configuration using the priority:
-// custom path -> global path -> defaults. Repo-specific and overrides are
-// intended but not implemented yet in this scaffolding.
-func LoadEffectiveConfig(customPath string) (Config, error) {
-	cfg := DefaultConfig()
+// LoadConfigForRepo loads the configuration for a given repository.
+// It merges the global config with the repo-specific config.
+func LoadConfigForRepo(owner, repo string) (Config, error) {
+	return LoadEffectiveConfig(
+		GlobalConfigPath(),
+		RepoConfigPath(owner, repo),
+	)
+}
 
-	// Helper to load YAML into cfg
-	load := func(path string) error {
+// LoadEffectiveConfig loads the configuration using priority order.
+// The last path takes precedence over the previous ones.
+func LoadEffectiveConfig(paths ...string) (Config, error) {
+	cfg := DefaultConfig()
+	for _, path := range paths {
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return err
+			return cfg, err
 		}
-		// Unmarshal into a temporary then merge; for scaffolding, overwrite
-		var fileCfg Config
-		if err := yaml.Unmarshal(data, &fileCfg); err != nil {
-			return err
-		}
-		mergeInto(&cfg, &fileCfg)
-		return nil
-	}
-
-	if customPath != "" {
-		if err := load(customPath); err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				return Config{}, err
-			}
-		}
-		return cfg, nil
-	}
-
-	globalPath := GlobalConfigPath()
-	if err := load(globalPath); err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			return Config{}, err
+		// Unmarshal directly into cfg.
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return cfg, err
 		}
 	}
-
 	return cfg, nil
 }
 
@@ -138,39 +121,4 @@ func RepoConfigPath(owner, repo string) string {
 		return filepath.Join("repositories", owner+"_"+repo+".yaml")
 	}
 	return path
-}
-
-// mergeInto merges non-zero values from src into dst.
-// This is a minimal shallow merge suitable for scaffolding.
-func mergeInto(dst, src *Config) {
-	if dst == nil || src == nil {
-		return
-	}
-	mergeStruct(reflect.ValueOf(dst).Elem(), reflect.ValueOf(src).Elem())
-}
-
-// mergeStruct copies non-zero fields from src into dst. It recurses into nested structs.
-// For booleans, only true overrides (keeps previous behavior of only setting when true).
-func mergeStruct(dst, src reflect.Value) {
-	if dst.Kind() != reflect.Struct || src.Kind() != reflect.Struct {
-		return
-	}
-	for i := 0; i < dst.NumField(); i++ {
-		dstField := dst.Field(i)
-		srcField := src.Field(i)
-
-		if !dstField.CanSet() {
-			continue
-		}
-
-		switch dstField.Kind() {
-		case reflect.Struct:
-			mergeStruct(dstField, srcField)
-		default:
-			// Only overwrite when the source field is non-zero
-			if !srcField.IsZero() {
-				dstField.Set(srcField)
-			}
-		}
-	}
 }
