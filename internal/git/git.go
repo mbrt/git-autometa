@@ -98,7 +98,7 @@ func (g *Utils) GetCurrentBranch() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(out), nil
+	return out, nil
 }
 
 // GetCommitMessagesForPR returns commit subjects from baseBranch..HEAD, with leading
@@ -112,8 +112,8 @@ func (g *Utils) GetCommitMessagesForPR(baseBranch string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	lines := strings.Split(strings.TrimSpace(out), "\n")
-	if len(lines) == 1 && strings.TrimSpace(lines[0]) == "" {
+	lines := strings.Split(out, "\n")
+	if len(lines) == 1 && lines[0] == "" {
 		return []string{}, nil
 	}
 	// Patterns to remove leading JIRA identifiers
@@ -140,7 +140,7 @@ func (g *Utils) GetRemoteURL(remote string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(out), nil
+	return out, nil
 }
 
 // --- helpers ---
@@ -165,7 +165,7 @@ func runGitDir(dir string, args ...string) (string, error) {
 		}
 		return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
 	}
-	return stdout.String(), nil
+	return strings.TrimSpace(stdout.String()), nil
 }
 
 func hasRemoteDir(dir, name string) bool {
@@ -173,8 +173,8 @@ func hasRemoteDir(dir, name string) bool {
 	if err != nil {
 		return false
 	}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if strings.TrimSpace(line) == name {
+	for _, line := range strings.Split(out, "\n") {
+		if line == name {
 			return true
 		}
 	}

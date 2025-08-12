@@ -6,6 +6,9 @@ import (
 
 	appconfig "git-autometa/internal/config"
 	"git-autometa/internal/jira"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatBranchName_DefaultPattern(t *testing.T) {
@@ -21,9 +24,7 @@ func TestFormatBranchName_DefaultPattern(t *testing.T) {
 
 	got := formatBranchName(cfg, issue)
 	want := "feature-PROJ-123-fix-login-validation-bug"
-	if got != want {
-		t.Fatalf("formatBranchName() = %q, want %q", got, want)
-	}
+	assert.Equal(t, want, got)
 }
 
 func TestFormatBranchName_CustomPatternAndType(t *testing.T) {
@@ -39,9 +40,7 @@ func TestFormatBranchName_CustomPatternAndType(t *testing.T) {
 
 	got := formatBranchName(cfg, issue)
 	want := "feature-APP-7"
-	if got != want {
-		t.Fatalf("formatBranchName() = %q, want %q", got, want)
-	}
+	assert.Equal(t, want, got)
 }
 
 func TestFormatBranchName_MaxLength(t *testing.T) {
@@ -55,21 +54,15 @@ func TestFormatBranchName_MaxLength(t *testing.T) {
 	}
 
 	got := formatBranchName(cfg, issue)
-	if len(got) > cfg.Git.MaxBranchLength {
-		t.Fatalf("branch length %d exceeds max %d: %q", len(got), cfg.Git.MaxBranchLength, got)
-	}
+	assert.LessOrEqual(t, len(got), cfg.Git.MaxBranchLength)
 }
 
 func TestSanitizeBranchName_RemovesDisallowedAndCollapses(t *testing.T) {
 	in := "feat//weird^name..with*[chars]? and spaces"
 	got := sanitizeBranchName(in)
 	// Ensure forbidden tokens replaced and multiple dashes/slashes collapsed
-	if got == in {
-		t.Fatalf("sanitizeBranchName did not change input: %q", got)
-	}
-	if containsAny(got, []string{"^", ":", "?", "*", "[", ".."}) {
-		t.Fatalf("sanitizeBranchName left disallowed chars in: %q", got)
-	}
+	assert.NotEqual(t, in, got)
+	assert.False(t, containsAny(got, []string{"^", ":", "?", "*", "[", ".."}))
 }
 
 func containsAny(s string, tokens []string) bool {
@@ -138,18 +131,10 @@ func TestStartWorkWithDeps_ArgFlow_NoPush(t *testing.T) {
 
 	var out bytes.Buffer
 	err := startWorkWithDeps([]string{"P-1"}, cfg, fj, fg, bytes.NewBuffer(nil), &out, false)
-	if err != nil {
-		t.Fatalf("startWorkWithDeps error: %v", err)
-	}
-	if fg.prepared != "feature-P-1-login-fix" {
-		t.Fatalf("unexpected prepared branch: %q", fg.prepared)
-	}
-	if fg.pushed != "" {
-		t.Fatalf("push should not be called; got %q", fg.pushed)
-	}
-	if out.Len() == 0 {
-		t.Fatal("expected some output")
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "feature-P-1-login-fix", fg.prepared)
+	assert.Empty(t, fg.pushed)
+	assert.NotZero(t, out.Len())
 }
 
 func TestStartWorkWithDeps_Interactive_Push(t *testing.T) {
@@ -164,13 +149,7 @@ func TestStartWorkWithDeps_Interactive_Push(t *testing.T) {
 	var out bytes.Buffer
 
 	err := startWorkWithDeps(nil, cfg, fj, fg, in, &out, true)
-	if err != nil {
-		t.Fatalf("startWorkWithDeps error: %v", err)
-	}
-	if fg.prepared != "X-7" {
-		t.Fatalf("unexpected prepared branch: %q", fg.prepared)
-	}
-	if fg.pushed != "X-7" {
-		t.Fatalf("expected push of X-7; got %q", fg.pushed)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "X-7", fg.prepared)
+	assert.Equal(t, "X-7", fg.pushed)
 }

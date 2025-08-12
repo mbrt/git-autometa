@@ -223,8 +223,8 @@ func runConfigEditRepo(in io.Reader, out io.Writer) error {
 		overrides.PullRequest.BaseBranch = s
 	}
 	fmt.Fprintf(out, "PR draft by default (true/false) [%t]: ", baseCfg.PullRequest.Draft)
-	if v, _ := reader.ReadString('\n'); strings.TrimSpace(v) != "" {
-		s := strings.ToLower(strings.TrimSpace(v))
+	if v := readString(reader); v != "" {
+		s := strings.ToLower(v)
 		switch s {
 		case "true", "t", "yes", "y":
 			overrides.PullRequest.Draft = true

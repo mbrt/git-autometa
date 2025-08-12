@@ -128,8 +128,7 @@ func formatPRTitle(cfg appconfig.Config, issue jira.Issue) string {
 	out := pattern
 	out = strings.ReplaceAll(out, "{jira_id}", issue.Key)
 	out = strings.ReplaceAll(out, "{jira_title}", titleSlug)
-	out = strings.ReplaceAll(out, "{jira_type}", strings.ToLower(strings.TrimSpace(issue.IssueType)))
-	out = strings.TrimSpace(out)
+	out = strings.ReplaceAll(out, "{jira_type}", strings.ToLower(issue.IssueType))
 	if out == "" {
 		if titleSlug != "" {
 			return fmt.Sprintf("%s: %s", issue.Key, titleSlug)
@@ -160,9 +159,9 @@ func formatPRBody(cfg appconfig.Config, cl gitContext, base string, issue jira.I
 	out := template
 	out = strings.ReplaceAll(out, "{jira_id}", issue.Key)
 	out = strings.ReplaceAll(out, "{jira_title}", issue.SlugifyTitle(0))
-	out = strings.ReplaceAll(out, "{jira_type}", strings.ToLower(strings.TrimSpace(issue.IssueType)))
-	out = strings.ReplaceAll(out, "{jira_url}", strings.TrimSpace(issue.URL))
+	out = strings.ReplaceAll(out, "{jira_type}", strings.ToLower(issue.IssueType))
+	out = strings.ReplaceAll(out, "{jira_url}", issue.URL)
 	out = strings.ReplaceAll(out, "{jira_description}", desc)
 	out = strings.ReplaceAll(out, "{commit_messages}", commitSection)
-	return strings.TrimSpace(out), nil
+	return out, nil
 }

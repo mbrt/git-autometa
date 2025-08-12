@@ -6,6 +6,9 @@ import (
 
 	appconfig "git-autometa/internal/config"
 	"git-autometa/internal/jira"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --- fakes ---
@@ -68,9 +71,8 @@ func TestExtractIssueKeyFromBranch(t *testing.T) {
 	}
 	for _, tc := range cases {
 		got, ok := extractIssueKeyFromBranch(tc.in)
-		if ok != tc.ok || got != tc.want {
-			t.Fatalf("extractIssueKeyFromBranch(%q) = (%q,%v), want (%q,%v)", tc.in, got, ok, tc.want, tc.ok)
-		}
+		assert.Equal(t, tc.ok, ok, "ok mismatch for %q", tc.in)
+		assert.Equal(t, tc.want, got, "key mismatch for %q", tc.in)
 	}
 }
 
@@ -81,22 +83,13 @@ func TestFormatPRTitle_AndBody_Defaults(t *testing.T) {
 
 	issue := jira.Issue{Key: "APP-7", Summary: "Add OAuth2", IssueType: "Feature", URL: "https://jira/browse/APP-7", Description: "h1. Title\n\n* a\n* b"}
 	title := formatPRTitle(cfg, issue)
-	if !strings.HasPrefix(title, "APP-7:") {
-		t.Fatalf("unexpected title: %q", title)
-	}
+	assert.True(t, strings.HasPrefix(title, "APP-7:"), "unexpected title: %q", title)
 	body, err := formatPRBody(cfg, &fakeGitInfo{commits: []string{"Implement", "Tests"}}, "main", issue)
-	if err != nil {
-		t.Fatalf("formatPRBody error: %v", err)
-	}
-	if !strings.Contains(body, "- Implement") || !strings.Contains(body, "- Tests") {
-		t.Fatalf("commit messages not rendered: %q", body)
-	}
-	if !strings.Contains(body, "# Title") { // converted heading
-		t.Fatalf("jira description not converted: %q", body)
-	}
-	if !strings.Contains(body, "[APP-7](https://jira/browse/APP-7)") {
-		t.Fatalf("jira link not present: %q", body)
-	}
+	require.NoError(t, err)
+	assert.Contains(t, body, "- Implement")
+	assert.Contains(t, body, "- Tests")
+	assert.Contains(t, body, "# Title")
+	assert.Contains(t, body, "[APP-7](https://jira/browse/APP-7)")
 }
 
 func TestCreatePRWithDeps_Success_Overrides(t *testing.T) {
@@ -111,22 +104,10 @@ func TestCreatePRWithDeps_Success_Overrides(t *testing.T) {
 
 	// Override base via flag and force non-draft
 	url, err := createPRWithDeps(cfg, jc, gu, gh, "main", true)
-	if err != nil {
-		t.Fatalf("createPRWithDeps error: %v", err)
-	}
-	if url == "" {
-		t.Fatal("expected PR url")
-	}
-	if gh.got.base != "main" {
-		t.Fatalf("expected base main, got %q", gh.got.base)
-	}
-	if gh.got.draft {
-		t.Fatalf("expected non-draft due to override, got draft=true")
-	}
-	if gh.got.head != gu.branch {
-		t.Fatalf("unexpected head: %q", gh.got.head)
-	}
-	if !strings.HasPrefix(gh.got.title, "PRJ-1:") {
-		t.Fatalf("unexpected title: %q", gh.got.title)
-	}
+	require.NoError(t, err)
+	assert.NotEmpty(t, url)
+	assert.Equal(t, "main", gh.got.base)
+	assert.False(t, gh.got.draft)
+	assert.Equal(t, gu.branch, gh.got.head)
+	assert.True(t, strings.HasPrefix(gh.got.title, "PRJ-1:"), "unexpected title: %q", gh.got.title)
 }

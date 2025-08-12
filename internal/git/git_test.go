@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func runCmd(t *testing.T, dir string, name string, args ...string) string {
@@ -13,9 +16,7 @@ func runCmd(t *testing.T, dir string, name string, args ...string) string {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("command failed: %s %s: %v\n%s", name, strings.Join(args, " "), err, string(out))
-	}
+	require.NoErrorf(t, err, "command failed: %s %s\n%s", name, strings.Join(args, " "), string(out))
 	return string(out)
 }
 
@@ -45,41 +46,29 @@ func TestPrepareWorkBranch_CreatesAndIncrements(t *testing.T) {
 
 	// First creation should use desired name
 	name, err := git.PrepareWorkBranch("feature/test")
-	if err != nil {
-		t.Fatalf("PrepareWorkBranch error: %v", err)
-	}
-	if name != "feature/test" {
-		t.Fatalf("expected branch name 'feature/test', got %q", name)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "feature/test", name)
 	cur, err := git.GetCurrentBranch()
-	if err != nil || cur != "feature/test" {
-		t.Fatalf("expected to be on 'feature/test', got %q, err=%v", cur, err)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "feature/test", cur)
 
 	// Second creation with same base should increment
 	name2, err := git.PrepareWorkBranch("feature/test")
-	if err != nil {
-		t.Fatalf("PrepareWorkBranch (second) error: %v", err)
-	}
-	if name2 != "feature/test-2" {
-		t.Fatalf("expected branch name 'feature/test-2', got %q", name2)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "feature/test-2", name2)
 	cur2, err := git.GetCurrentBranch()
-	if err != nil || cur2 != "feature/test-2" {
-		t.Fatalf("expected to be on 'feature/test-2', got %q, err=%v", cur2, err)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "feature/test-2", cur2)
 }
 
 func TestPushBranch_NoOrigin(t *testing.T) {
 	repoDir := initTempRepo(t)
 	git := NewUtilsWithWorkDir(repoDir)
 
-	if _, err := git.PrepareWorkBranch("feat/push-no-origin"); err != nil {
-		t.Fatalf("prepare branch: %v", err)
-	}
-	if err := git.PushBranch("feat/push-no-origin"); err == nil {
-		t.Fatalf("expected error when pushing without origin remote")
-	}
+	_, err := git.PrepareWorkBranch("feat/push-no-origin")
+	require.NoError(t, err)
+	err = git.PushBranch("feat/push-no-origin")
+	require.Error(t, err)
 }
 
 func TestPushBranch_WithOriginAndRemoteURL(t *testing.T) {
@@ -93,45 +82,33 @@ func TestPushBranch_WithOriginAndRemoteURL(t *testing.T) {
 	// Add origin remote to working repo
 	runCmd(t, repoDir, "git", "remote", "add", "origin", remoteDir)
 
-	if _, err := git.PrepareWorkBranch("feat/push-origin"); err != nil {
-		t.Fatalf("prepare branch: %v", err)
-	}
-	if err := git.PushBranch("feat/push-origin"); err != nil {
-		t.Fatalf("push branch: %v", err)
-	}
+	_, err := git.PrepareWorkBranch("feat/push-origin")
+	require.NoError(t, err)
+	err = git.PushBranch("feat/push-origin")
+	require.NoError(t, err)
 
 	url, err := git.GetRemoteURL("origin")
-	if err != nil {
-		t.Fatalf("get remote url: %v", err)
-	}
-	if strings.TrimSpace(url) != remoteDir {
-		t.Fatalf("unexpected remote url: %q (want %q)", url, remoteDir)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, remoteDir, strings.TrimSpace(url))
 }
 
 func TestGetCurrentBranch(t *testing.T) {
 	repoDir := initTempRepo(t)
 	git := NewUtilsWithWorkDir(repoDir)
 
-	if _, err := git.PrepareWorkBranch("feat/current"); err != nil {
-		t.Fatalf("prepare branch: %v", err)
-	}
+	_, err := git.PrepareWorkBranch("feat/current")
+	require.NoError(t, err)
 	cur, err := git.GetCurrentBranch()
-	if err != nil {
-		t.Fatalf("get current branch: %v", err)
-	}
-	if cur != "feat/current" {
-		t.Fatalf("unexpected current branch: %q", cur)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "feat/current", cur)
 }
 
 func TestGetCommitMessagesForPR_CleansTags(t *testing.T) {
 	repoDir := initTempRepo(t)
 	git := NewUtilsWithWorkDir(repoDir)
 
-	if _, err := git.PrepareWorkBranch("feat/commits"); err != nil {
-		t.Fatalf("prepare branch: %v", err)
-	}
+	_, err := git.PrepareWorkBranch("feat/commits")
+	require.NoError(t, err)
 
 	// two commits with jira-like subjects
 	if err := os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("one"), 0o644); err != nil {
@@ -147,13 +124,9 @@ func TestGetCommitMessagesForPR_CleansTags(t *testing.T) {
 	runCmd(t, repoDir, "git", "commit", "-m", "PROJ-1: Add tests")
 
 	msgs, err := git.GetCommitMessagesForPR("main")
-	if err != nil {
-		t.Fatalf("get commit messages: %v", err)
-	}
+	require.NoError(t, err)
 	got := strings.Join(msgs, "|")
 	// git log returns newest first by default
 	want := "Add tests|Implement feature"
-	if got != want {
-		t.Fatalf("unexpected messages: %q (want %q)", got, want)
-	}
+	assert.Equal(t, want, got)
 }

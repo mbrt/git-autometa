@@ -64,8 +64,7 @@ func selectIssueInteractively(jc jiraService, in io.Reader, out io.Writer) (*jir
 		}
 		fmt.Fprint(out, "Enter a JIRA issue key (or leave empty to cancel): ")
 		reader := bufio.NewReader(in)
-		line, _ := reader.ReadString('\n')
-		key := strings.TrimSpace(line)
+		key := readString(reader)
 		if key == "" {
 			return nil, nil
 		}
@@ -90,8 +89,7 @@ func selectIssueInteractively(jc jiraService, in io.Reader, out io.Writer) (*jir
 	reader := bufio.NewReader(in)
 	for {
 		fmt.Fprint(out, "Select an issue: ")
-		line, _ := reader.ReadString('\n')
-		choiceStr := strings.TrimSpace(line)
+		choiceStr := readString(reader)
 		if choiceStr == "" {
 			continue
 		}
@@ -116,7 +114,7 @@ func formatBranchName(cfg appconfig.Config, issue jira.Issue) string {
 	titleSlug := issue.SlugifyTitle(maxLen)
 	branch := strings.ReplaceAll(pattern, "{jira_id}", issue.Key)
 	branch = strings.ReplaceAll(branch, "{jira_title}", titleSlug)
-	branch = strings.ReplaceAll(branch, "{jira_type}", strings.ToLower(strings.TrimSpace(issue.IssueType)))
+	branch = strings.ReplaceAll(branch, "{jira_type}", strings.ToLower(issue.IssueType))
 	branch = sanitizeBranchName(branch)
 	if maxLen > 0 && len(branch) > maxLen {
 		branch = branch[:maxLen]
@@ -147,7 +145,7 @@ func startWorkWithDeps(args []string, cfg appconfig.Config, jc jiraService, gu g
 		err           error
 	)
 	if len(args) == 1 {
-		issueKey := strings.TrimSpace(args[0])
+		issueKey := args[0]
 		if issueKey == "" {
 			return errors.New("empty JIRA key provided")
 		}
@@ -193,7 +191,6 @@ func startWorkWithDeps(args []string, cfg appconfig.Config, jc jiraService, gu g
 
 // sanitizeBranchName performs minimal cleanup to ensure a safe git branch name.
 func sanitizeBranchName(s string) string {
-	s = strings.TrimSpace(s)
 	// Replace any non-alphanumeric character with a dash using a whitelist approach
 	var b strings.Builder
 	b.Grow(len(s))

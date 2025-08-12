@@ -26,8 +26,8 @@ type Client struct {
 // will be used to scope gh operations via --repo <owner>/<repo>.
 func NewClient(cfg appconfig.Config) Client {
 	return Client{
-		owner: strings.TrimSpace(cfg.GitHub.Owner),
-		repo:  strings.TrimSpace(cfg.GitHub.Repo),
+		owner: cfg.GitHub.Owner,
+		repo:  cfg.GitHub.Repo,
 		run:   defaultRunner,
 	}
 }
@@ -36,14 +36,14 @@ func NewClient(cfg appconfig.Config) Client {
 func (c Client) TestConnection() error {
 	_, stderr, err := c.run(context.Background(), "gh", "auth", "status")
 	if err != nil {
-		return fmt.Errorf("github: gh auth status failed: %v: %s", err, strings.TrimSpace(stderr))
+		return fmt.Errorf("github: gh auth status failed: %v: %s", err, stderr)
 	}
 	return nil
 }
 
 // CreatePullRequest creates a pull request using gh and returns the PR URL.
 func (c Client) CreatePullRequest(title, body, head, base string, draft bool) (string, error) {
-	if strings.TrimSpace(title) == "" {
+	if title == "" {
 		return "", errors.New("github: title is required")
 	}
 	args := []string{"pr", "create", "--title", title, "--body", body, "--json", "url"}
@@ -62,7 +62,7 @@ func (c Client) CreatePullRequest(title, body, head, base string, draft bool) (s
 
 	stdout, stderr, err := c.run(context.Background(), "gh", args...)
 	if err != nil {
-		return "", fmt.Errorf("github: gh pr create failed: %v: %s", err, strings.TrimSpace(stderr))
+		return "", fmt.Errorf("github: gh pr create failed: %v: %s", err, stderr)
 	}
 
 	// gh --json url returns a small JSON object {"url":"..."}
@@ -71,11 +71,10 @@ func (c Client) CreatePullRequest(title, body, head, base string, draft bool) (s
 	}
 	if err := json.NewDecoder(strings.NewReader(stdout)).Decode(&payload); err != nil {
 		// If output isn't JSON (older gh or unexpected), fallback to trimming stdout
-		trimmed := strings.TrimSpace(stdout)
-		if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
-			return trimmed, nil
+		if strings.HasPrefix(stdout, "http://") || strings.HasPrefix(stdout, "https://") {
+			return stdout, nil
 		}
-		return "", fmt.Errorf("github: unable to parse gh output: %w; output: %s", err, trimmed)
+		return "", fmt.Errorf("github: unable to parse gh output: %w; output: %s", err, stdout)
 	}
 	if payload.URL == "" {
 		return "", errors.New("github: gh returned empty URL")
@@ -107,7 +106,7 @@ func (c Client) ListPullRequests(state string, limit int) ([]PullRequest, error)
 	}
 	stdout, stderr, err := c.run(context.Background(), "gh", args...)
 	if err != nil {
-		return nil, fmt.Errorf("github: gh pr list failed: %v: %s", err, strings.TrimSpace(stderr))
+		return nil, fmt.Errorf("github: gh pr list failed: %v: %s", err, stderr)
 	}
 	var prs []PullRequest
 	if err := json.NewDecoder(strings.NewReader(stdout)).Decode(&prs); err != nil {

@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	appconfig "git-autometa/internal/config"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestClient(t *testing.T, handler http.HandlerFunc) (Client, *httptest.Server) {
@@ -26,20 +29,14 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) (Client, *httptest.Se
 
 func TestTestConnection_OK(t *testing.T) {
 	client, ts := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/rest/api/2/myself" {
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-		}
-		if r.Header.Get("Authorization") == "" {
-			t.Fatalf("missing Authorization header")
-		}
+		require.Equal(t, "/rest/api/2/myself", r.URL.Path)
+		require.NotEmpty(t, r.Header.Get("Authorization"))
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"self":"ok"}`))
 	})
 	defer ts.Close()
 
-	if err := client.TestConnection(); err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
+	require.NoError(t, client.TestConnection())
 }
 
 func TestTestConnection_ErrorStatus(t *testing.T) {
@@ -49,9 +46,8 @@ func TestTestConnection_ErrorStatus(t *testing.T) {
 	})
 	defer ts.Close()
 
-	if err := client.TestConnection(); err == nil {
-		t.Fatalf("expected error, got nil")
-	}
+	err := client.TestConnection()
+	require.Error(t, err)
 }
 
 func TestSearchMyIssues(t *testing.T) {
@@ -82,19 +78,15 @@ func TestSearchMyIssues(t *testing.T) {
 	defer ts.Close()
 
 	issues, err := client.SearchMyIssues(5)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(issues) != 1 {
-		t.Fatalf("expected 1 issue, got %d", len(issues))
-	}
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
 	got := issues[0]
-	if got.Key != "PROJ-1" || got.Summary != "Fix bug" || got.IssueType != "Bug" || got.Status != "In Progress" || got.Assignee != "Jane" {
-		t.Fatalf("unexpected issue content: %+v", got)
-	}
-	if got.URL == "" {
-		t.Fatalf("expected URL to be set")
-	}
+	assert.Equal(t, "PROJ-1", got.Key)
+	assert.Equal(t, "Fix bug", got.Summary)
+	assert.Equal(t, "Bug", got.IssueType)
+	assert.Equal(t, "In Progress", got.Status)
+	assert.Equal(t, "Jane", got.Assignee)
+	assert.NotEmpty(t, got.URL)
 }
 
 func TestGetIssue(t *testing.T) {
@@ -118,13 +110,10 @@ func TestGetIssue(t *testing.T) {
 	defer ts.Close()
 
 	iss, err := client.GetIssue("PROJ-2")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if iss == nil || iss.Key != "PROJ-2" || iss.IssueType != "Story" || iss.Assignee != "John" {
-		t.Fatalf("unexpected issue: %+v", iss)
-	}
-	if iss.URL == "" {
-		t.Fatalf("expected URL to be set")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, iss)
+	assert.Equal(t, "PROJ-2", iss.Key)
+	assert.Equal(t, "Story", iss.IssueType)
+	assert.Equal(t, "John", iss.Assignee)
+	assert.NotEmpty(t, iss.URL)
 }

@@ -3,15 +3,15 @@ package markdown
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestConvertJiraToMarkdown_Headings(t *testing.T) {
 	in := "h1. Title\nMore\nh3. Small\n"
 	want := "# Title\nMore\n### Small\n"
 	got := ConvertJiraToMarkdown(in)
-	if got != want {
-		t.Fatalf("headings:\nwant:\n%q\n got:\n%q", want, got)
-	}
+	assert.Equalf(t, want, got, "headings mismatch")
 }
 
 func TestConvertJiraToMarkdown_Lists(t *testing.T) {
@@ -32,9 +32,7 @@ func TestConvertJiraToMarkdown_Lists(t *testing.T) {
 		"",
 	}, "\n")
 	got := ConvertJiraToMarkdown(in)
-	if got != want {
-		t.Fatalf("lists:\nwant:\n%q\n got:\n%q", want, got)
-	}
+	assert.Equalf(t, want, got, "lists mismatch")
 }
 
 func TestConvertJiraToMarkdown_InlineStylesAndLinks(t *testing.T) {
@@ -53,9 +51,7 @@ func TestConvertJiraToMarkdown_InlineStylesAndLinks(t *testing.T) {
 		"",
 	}, "\n")
 	got := ConvertJiraToMarkdown(in)
-	if got != want {
-		t.Fatalf("inline styles/links:\nwant:\n%q\n got:\n%q", want, got)
-	}
+	assert.Equalf(t, want, got, "inline styles/links mismatch")
 }
 
 func TestConvertJiraToMarkdown_CodeBlocks(t *testing.T) {
@@ -76,9 +72,7 @@ func TestConvertJiraToMarkdown_CodeBlocks(t *testing.T) {
 		"",
 	}, "\n")
 	got := ConvertJiraToMarkdown(in)
-	if got != want {
-		t.Fatalf("code blocks:\nwant:\n%q\n got:\n%q", want, got)
-	}
+	assert.Equalf(t, want, got, "code blocks mismatch")
 }
 
 func TestConvertJiraToMarkdown_QuoteBlocks(t *testing.T) {
@@ -95,9 +89,7 @@ func TestConvertJiraToMarkdown_QuoteBlocks(t *testing.T) {
 		"",
 	}, "\n")
 	got := ConvertJiraToMarkdown(in)
-	if got != want {
-		t.Fatalf("quote blocks:\nwant:\n%q\n got:\n%q", want, got)
-	}
+	assert.Equalf(t, want, got, "quote blocks mismatch")
 }
 
 func TestConvertJiraToMarkdown_Tables_HeaderAndBody(t *testing.T) {
@@ -115,16 +107,12 @@ func TestConvertJiraToMarkdown_Tables_HeaderAndBody(t *testing.T) {
 		"",
 	}, "\n")
 	got := ConvertJiraToMarkdown(in)
-	if got != want {
-		t.Fatalf("tables:\nwant:\n%q\n got:\n%q", want, got)
-	}
+	assert.Equalf(t, want, got, "tables mismatch")
 }
 
 func TestConvertJiraToMarkdown_NewlineNormalization(t *testing.T) {
 	in := "h2. Title\r\n* item\r\n"
 	want := "## Title\n- item\n"
 	got := ConvertJiraToMarkdown(in)
-	if got != want {
-		t.Fatalf("newlines:\nwant:\n%q\n got:\n%q", want, got)
-	}
+	assert.Equalf(t, want, got, "newlines mismatch")
 }
