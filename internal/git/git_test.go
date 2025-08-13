@@ -42,7 +42,7 @@ func initTempRepo(t *testing.T) string {
 
 func TestPrepareWorkBranch_CreatesAndIncrements(t *testing.T) {
 	repoDir := initTempRepo(t)
-	git := NewWithWorkDir(repoDir)
+	git := Git{WorkDir: repoDir, MainBranch: "main"}
 
 	// First creation should use desired name
 	name, err := git.PrepareWorkBranch("feature/test")
@@ -63,7 +63,7 @@ func TestPrepareWorkBranch_CreatesAndIncrements(t *testing.T) {
 
 func TestPushBranch_NoOrigin(t *testing.T) {
 	repoDir := initTempRepo(t)
-	git := NewWithWorkDir(repoDir)
+	git := Git{WorkDir: repoDir, MainBranch: "main"}
 
 	_, err := git.PrepareWorkBranch("feat/push-no-origin")
 	require.NoError(t, err)
@@ -73,7 +73,7 @@ func TestPushBranch_NoOrigin(t *testing.T) {
 
 func TestPushBranch_WithOriginAndRemoteURL(t *testing.T) {
 	repoDir := initTempRepo(t)
-	git := NewWithWorkDir(repoDir)
+	git := Git{WorkDir: repoDir, MainBranch: "main"}
 
 	// Create bare remote repo
 	remoteDir := t.TempDir()
@@ -94,7 +94,7 @@ func TestPushBranch_WithOriginAndRemoteURL(t *testing.T) {
 
 func TestGetCurrentBranch(t *testing.T) {
 	repoDir := initTempRepo(t)
-	git := NewWithWorkDir(repoDir)
+	git := Git{WorkDir: repoDir, MainBranch: "main"}
 
 	_, err := git.PrepareWorkBranch("feat/current")
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestGetCurrentBranch(t *testing.T) {
 
 func TestGetCommitMessagesForPR_CleansTags(t *testing.T) {
 	repoDir := initTempRepo(t)
-	git := NewWithWorkDir(repoDir)
+	git := Git{WorkDir: repoDir, MainBranch: "main"}
 
 	_, err := git.PrepareWorkBranch("feat/commits")
 	require.NoError(t, err)

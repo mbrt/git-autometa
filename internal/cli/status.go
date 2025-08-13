@@ -38,7 +38,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 
 	// Repository info
 	fmt.Println("Repository:")
-	gitUtils := git.New()
+	gitUtils := git.Git{MainBranch: cfg.PullRequest.BaseBranch}
 	if branch, err := gitUtils.GetCurrentBranch(); err == nil {
 		fmt.Printf("  Current branch: %s\n", branch)
 	} else {

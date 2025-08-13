@@ -250,7 +250,7 @@ func resolveOwnerRepo() (string, string) {
 		return owner, repo
 	}
 	// Try git remote
-	gitUtils := git.New()
+	gitUtils := git.Git{}
 	remoteURL, err := gitUtils.GetRemoteURL("origin")
 	if err == nil {
 		if o, r, ok := parseGitHubOwnerRepo(remoteURL); ok {

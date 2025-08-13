@@ -133,7 +133,7 @@ func runStartWork(args []string) error {
 	if err != nil {
 		return err
 	}
-	gitUtils := git.New()
+	gitUtils := git.Git{MainBranch: cfg.PullRequest.BaseBranch}
 	return startWorkWithDeps(args, cfg, jiraClient, gitUtils, os.Stdin, os.Stdout, pushFlag)
 }
 

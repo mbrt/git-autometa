@@ -49,7 +49,7 @@ func runCreatePR(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	ghClient := github.NewClient(cfg)
-	gitUtils := git.New()
+	gitUtils := git.Git{MainBranch: cfg.PullRequest.BaseBranch}
 
 	url, err := createPRWithDeps(cfg, jiraClient, gitUtils, ghClient, baseBranch, noDraft)
 	if err != nil {
