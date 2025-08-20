@@ -497,7 +497,7 @@ class GitUtils:
         else:
             location = "remotely"
 
-        click.echo(f"\n[yellow]Branch '{branch_name}' already exists {location}[/yellow]")
+        click.echo(click.style(f"\nBranch '{branch_name}' already exists {location}", fg="yellow"))
 
         # Show options
         click.echo("\nChoose an action:")
