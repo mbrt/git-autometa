@@ -32,6 +32,9 @@ git clone https://github.com/mbrt/git-autometa.git
 pipx install .
 ```
 
+This depends on `pandoc` being installed and available: use your system package
+manager on Linux (e.g. `apt install pandoc`) or `brew install pandoc` on Mac.
+
 ## Quick Start
 
 1. **Configure git-autometa globally:**
