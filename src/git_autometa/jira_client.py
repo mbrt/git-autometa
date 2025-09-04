@@ -137,7 +137,7 @@ class JiraClient:
     def test_connection(self) -> bool:
         """Test JIRA connection"""
         try:
-            url = urljoin(self.server_url, '/rest/api/2/myself')
+            url = urljoin(self.server_url, '/rest/api/3/myself')
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
             logger.info("JIRA connection test successful")
@@ -163,7 +163,7 @@ class JiraClient:
             # JQL to find issues assigned to current user excluding Done category, ordered by most recent first
             jql = "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
 
-            url = urljoin(self.server_url, '/rest/api/2/search')
+            url = urljoin(self.server_url, '/rest/api/3/search/jql')
             params = {
                 'jql': jql,
                 'maxResults': limit,
@@ -211,7 +211,7 @@ class JiraClient:
             if not re.match(r'^[A-Z]+-\d+$', issue_key):
                 raise ValueError(f"Invalid JIRA issue key format: {issue_key}")
 
-            url = urljoin(self.server_url, f'/rest/api/2/issue/{issue_key}')
+            url = urljoin(self.server_url, f'/rest/api/3/issue/{issue_key}')
             response = self.session.get(url, timeout=10)
 
             if response.status_code == 404:
