@@ -54,6 +54,160 @@ class TestJiraIssue:
         assert issue.status == 'Open'
         assert issue.assignee is None
 
+    def test_issue_adf_description(self):
+        """Test issue with ADF (Atlassian Document Format) description"""
+        # Example ADF structure from JIRA v3 API
+        adf_description = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "This is a paragraph with "
+                        },
+                        {
+                            "type": "text",
+                            "text": "bold text",
+                            "marks": [{"type": "strong"}]
+                        },
+                        {
+                            "type": "text",
+                            "text": " and normal text."
+                        }
+                    ]
+                },
+                {
+                    "type": "paragraph",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Second paragraph."
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        issue_data = {
+            'key': 'PROJ-789',
+            'fields': {
+                'summary': 'ADF Issue',
+                'description': adf_description,
+                'issuetype': {'name': 'Story'},
+                'status': {'name': 'Open'},
+                'assignee': {'displayName': 'Test User'}
+            }
+        }
+        
+        issue = JiraIssue(issue_data)
+        
+        assert issue.key == 'PROJ-789'
+        assert issue.summary == 'ADF Issue'
+        # Should extract plain text from ADF
+        expected_text = "This is a paragraph with bold text and normal text.\nSecond paragraph."
+        assert issue.description == expected_text
+        assert issue.issue_type == 'story'
+        assert issue.status == 'Open'
+        assert issue.assignee == 'Test User'
+
+    def test_issue_plain_text_description(self):
+        """Test issue with plain text description (backward compatibility)"""
+        issue_data = {
+            'key': 'PROJ-101',
+            'fields': {
+                'summary': 'Plain Text Issue',
+                'description': 'This is a plain text description.',
+                'issuetype': {'name': 'Bug'},
+                'status': {'name': 'In Progress'},
+                'assignee': {'displayName': 'Developer'}
+            }
+        }
+        
+        issue = JiraIssue(issue_data)
+        
+        assert issue.key == 'PROJ-101'
+        assert issue.summary == 'Plain Text Issue'
+        assert issue.description == 'This is a plain text description.'
+        assert issue.issue_type == 'bug'
+        assert issue.status == 'In Progress'
+        assert issue.assignee == 'Developer'
+
+    def test_issue_complex_adf_description(self):
+        """Test issue with complex ADF description including lists"""
+        adf_description = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "heading",
+                    "attrs": {"level": 2},
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Requirements"
+                        }
+                    ]
+                },
+                {
+                    "type": "bulletList",
+                    "content": [
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": "First requirement"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": "Second requirement"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        issue_data = {
+            'key': 'PROJ-202',
+            'fields': {
+                'summary': 'Complex ADF Issue',
+                'description': adf_description,
+                'issuetype': {'name': 'Epic'},
+                'status': {'name': 'Planning'},
+                'assignee': {'displayName': 'Product Owner'}
+            }
+        }
+        
+        issue = JiraIssue(issue_data)
+        
+        assert issue.key == 'PROJ-202'
+        assert issue.summary == 'Complex ADF Issue'
+        # Should extract text from headings and lists
+        description = issue.description
+        assert 'Requirements' in description
+        assert '• First requirement' in description
+        assert '• Second requirement' in description
+
     def test_issue_url_setting(self):
         """Test setting issue URL"""
         issue_data = {'key': 'PROJ-789', 'fields': {}}

@@ -33,7 +33,81 @@ class JiraIssue:
     @property
     def description(self) -> str:
         """Issue description"""
-        return self.data.get('fields', {}).get('description', '')
+        raw_description = self.data.get('fields', {}).get('description', '')
+        
+        # Handle JIRA v3 ADF (Atlassian Document Format) 
+        if isinstance(raw_description, dict):
+            return self._extract_text_from_adf(raw_description)
+        
+        # Handle plain text (backward compatibility)
+        return raw_description or ''
+    
+    def _extract_text_from_adf(self, adf_content: dict) -> str:
+        """
+        Extract plain text from JIRA ADF (Atlassian Document Format) content
+        
+        Args:
+            adf_content: ADF dictionary content
+            
+        Returns:
+            Plain text extracted from ADF
+        """
+        if not isinstance(adf_content, dict):
+            return str(adf_content) if adf_content else ''
+        
+        # ADF structure: {"version": 1, "type": "doc", "content": [...]}
+        content = adf_content.get('content', [])
+        if not isinstance(content, list):
+            return ''
+        
+        text_parts = []
+        
+        for node in content:
+            if isinstance(node, dict):
+                text_parts.append(self._extract_text_from_adf_node(node))
+        
+        return '\n'.join(text_parts).strip()
+    
+    def _extract_text_from_adf_node(self, node: dict) -> str:
+        """
+        Extract text from a single ADF node
+        
+        Args:
+            node: ADF node dictionary
+            
+        Returns:
+            Plain text from the node
+        """
+        if not isinstance(node, dict):
+            return ''
+        
+        node_type = node.get('type', '')
+        text_parts = []
+        
+        # Handle text nodes
+        if node_type == 'text':
+            return node.get('text', '')
+        
+        # Handle nodes with content (paragraphs, headings, etc.)
+        content = node.get('content', [])
+        if isinstance(content, list):
+            for child_node in content:
+                if isinstance(child_node, dict):
+                    text_parts.append(self._extract_text_from_adf_node(child_node))
+        
+        # Join text parts and clean up extra spaces
+        if node_type in ['paragraph', 'heading']:
+            # For paragraphs and headings, concatenate directly since text nodes contain their own spacing
+            result = ''.join(text_parts)
+            # Clean up multiple spaces
+            return ' '.join(result.split())
+        elif node_type in ['listItem']:
+            result = ''.join(text_parts)
+            return '• ' + ' '.join(result.split())
+        else:
+            # For other nodes, concatenate directly
+            result = ''.join(text_parts)
+            return ' '.join(result.split()) if result.strip() else ''
 
     @property
     def description_markdown(self) -> str:
