@@ -5,7 +5,7 @@ Main CLI for git-autometa
 import click
 import logging
 import sys
-from pathlib import Path
+from click_aliases import ClickAliasedGroup
 from rich.console import Console
 from rich.logging import RichHandler
 
@@ -140,7 +140,7 @@ def select_jira_issue_interactively(jira_client: JiraClient) -> str:
             console.print(f"[red]Invalid input. Please enter a number between 0 and {len(issues)}[/red]")
 
 
-@click.group()
+@click.group(cls=ClickAliasedGroup)
 @click.option('--config', '-c', help='Configuration file path')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
 @click.pass_context
@@ -163,7 +163,7 @@ def cli(ctx, config, verbose):
         sys.exit(1)
 
 
-@cli.command("start-work")
+@cli.command("start-work", aliases=['w'])
 @click.argument('jira_issue', required=False)
 @click.option('--push', is_flag=True, help='Push branch to remote after creation')
 @click.pass_context
@@ -224,7 +224,7 @@ def start_work(ctx, jira_issue, push):
         sys.exit(1)
 
 
-@cli.command("create-pr")
+@cli.command("create-pr", aliases=['p', 'pr'])
 @click.option('--base-branch', help='Base branch for PR (overrides config)')
 @click.option('--no-draft', is_flag=True, help='Create PR as ready for review')
 @click.pass_context
